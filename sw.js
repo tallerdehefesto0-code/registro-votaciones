@@ -1,5 +1,5 @@
 // Service worker: intenta la red primero y guarda copia; sin internet usa la copia guardada.
-const V = 'votaciones-d3';
+const V = 'votaciones-d4';
 const F = ['./', 'index.html', 'manifest.json', 'css/styles.css',
   'js/app.js', 'js/calc.js', 'js/csv.js', 'js/db.js', 'js/excel.js', 'js/exportar.js', 'js/informes.js',
   'js/navegacion.js', 'js/pdf.js', 'js/seed.js', 'js/state.js',
