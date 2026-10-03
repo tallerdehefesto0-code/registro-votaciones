@@ -343,9 +343,6 @@ function guardarValorVoz(v) {
   S.votos[key_of(voz.c, voz.m.num, fl[voz.pos][1])] = v;
   save();
   actualizarTabla(voz.c, true, ctx);
-  const ci  = mesasVisibles(voz.c).findIndex(m => m.num === voz.m.num);
-  const inp = app()?.querySelector(`input[data-c="${ci}"][data-r="${voz.pos}"]`);
-  if (inp) inp.value = v;
   voz.msg = '';
   if (voz.pos < fl.length - 1) irA(voz.pos + 1);
   else voz.msg = 'Última casilla guardada. Revisa los totales y cierra la mesa.';

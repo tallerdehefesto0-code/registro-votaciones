@@ -27,7 +27,7 @@
 //     - actualizarTabla(c, diferido)        → refresca celdas sin re-render
 
 import { CARGOS, OTROS, key, claveOrg, mesasDe, orgsDe, datosMesa,
-         resumenCargo, pct, avisoMesa, maxCelda }               from './calc.js';
+         resumenCargo, pct, avisoMesa, maxCelda, cargosDeMesa }  from './calc.js';
 import { st, save, registrarEvento }                            from './state.js';
 import { contextoDe, territorioActivo, navegacionCompleta,
          pasoNavegacion, etiquetaPaso, frasePaso,
@@ -120,6 +120,21 @@ function filtrar(c, m, x, el) {
   if (nota) nota.textContent = pasa
     ? `Mesa ${m.num}: el máximo para esta casilla es ${num(max)} (electores hábiles: ${num(m.hab)}).`
     : '';
+}
+
+function guardarHab(c, m, el) {
+  const n     = parseInt(el.value, 10);
+  const mayor = Math.max(0, ...cargosDeMesa(S, m).map(cg => datosMesa(S, cg, m).total));
+  const nota  = appEl()?.querySelector('[data-k="nota"]');
+  if (!(n >= 1) || n < mayor) {
+    if (nota) nota.textContent = `Mesa ${m.num}: los electores hábiles deben ser un entero mayor que 0 y no menor que ${mayor} (el mayor total ya registrado).`;
+    el.value = m.hab > 0 ? m.hab : '';
+    return;
+  }
+  if (nota) nota.textContent = '';
+  m.hab = n;
+  save();
+  actualizarTabla(c, true, null);
 }
 
 function guardarCelda(c, m, x, el, ctx) {
@@ -229,7 +244,23 @@ function agendarResumen(c) {
   else setTimeout(ejecutar, 0);
 }
 
+// Iguala las casillas visibles con S.votos (la voz guarda sin repintar la tabla)
+function sincronizarValores(c) {
+  const ms    = mesasVisibles(c);
+  const cols  = vista === 'completa' ? ms : ms[sel] ? [ms[sel]] : [];
+  const filas = filasDe(c);
+  document.querySelectorAll('.tabla-votacion input[data-c][data-r]').forEach(el => {
+    const m = cols[Number(el.dataset.c)], f = filas[Number(el.dataset.r)];
+    if (!m || !f) return;
+    const v   = S.votos[key(c, m.num, f[1])];
+    const txt = v === undefined ? '' : String(v);
+    if (el.value !== txt) el.value = txt;
+  });
+}
+
 export function actualizarTabla(c, diferido = false, ctx = null) {
+  sincronizarValores(c);
+
   const territorio = territorioActivo(c);
   const ms = mesasVisibles(c);
   const avs = [];
@@ -566,7 +597,12 @@ export function tabla(c, ctx, descargar) {
           calc('Omisos (no votaron)', 'om'),
           h('tr', { class: 'calc' },
             h('th', {}, 'Votantes por mesa (electores hábiles)'),
-            ...cols.map(m => h('td', {}, m.hab > 0 ? num(m.hab) : 'Pendiente')),
+            ...cols.map(m => h('td', {}, h('input', {
+              type: 'number', min: '1', inputmode: 'numeric', autocomplete: 'off',
+              'aria-label': `Electores hábiles de la mesa ${m.num}`,
+              value: m.hab > 0 ? m.hab : '',
+              onchange: e => guardarHab(c, m, e.target),
+            }))),
             completa && h('td', { 'data-k': 'hab|T' }),
             completa && h('td'),
             completa && h('td'),

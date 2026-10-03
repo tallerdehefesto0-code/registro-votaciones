@@ -68,10 +68,11 @@ export function leerMesas(texto) {
   const f = filas || parseCSV(texto), err = [], mesas = [];
   if (!encabezado(f, 'codigo,distrito,local,electores') && !encabezado(f, 'mesa,distrito,local,electores')) return { err: ['Encabezado esperado: codigo,distrito,local,electores'] };
   f.slice(1).forEach((r, i) => {
-    const ln = i + 2, n = String(r[0] || '').trim(), distrito = String(r[1] || '').trim(), hab = ent(r[3] || '');
+    const ln = i + 2, n = String(r[0] || '').trim(), distrito = String(r[1] || '').trim(),
+          hs = String(r[3] ?? '').trim(), hab = hs === '' ? 0 : ent(hs);
     if (!/^\d{6}$/.test(n)) err.push(`Línea ${ln}: el código de mesa debe tener seis dígitos`);
     else if (!distrito) err.push(`Línea ${ln}: falta el distrito de la mesa`);
-    else if (!(hab > 0)) err.push(`Línea ${ln}: los electores hábiles deben ser un entero mayor que 0`);
+    else if (hs !== '' && !(hab > 0)) err.push(`Línea ${ln}: los electores hábiles deben estar vacíos o ser un entero mayor que 0`);
     else if (mesas.some(m => m.num === n)) err.push(`Línea ${ln}: la mesa ${n} está repetida`);
     else mesas.push({ num: n, distrito, local: (r[2] || '').trim(), hab });
   });
