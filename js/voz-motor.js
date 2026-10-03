@@ -242,18 +242,34 @@ function iniciarVoz(automatico = false) {
     voz.msg = 'No se pudo iniciar el reconocimiento de voz.';
     return pintarVoz();
   }
+
   rec = r;
+  let procesadoHasta = -1;
+  let ultimoFinal = { texto: '', t: 0 };
   r.lang = 'es-PE'; r.interimResults = true; r.continuous = true;
 
   r.onresult = e => {
     if (rec !== r) return;
-    const res = e.results[e.results.length - 1];
     reintentoRed = 0;
     if (voz.msg.startsWith('La conexión de voz')) voz.msg = '';
-    voz.oido = res[0].transcript;
-    mostrarMonitorVoz(voz.oido, res.isFinal);
-    if (res.isFinal) procesarVoz(voz.oido);
-    else pintarVoz();
+    let huboFinal = false;
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const res = e.results[i];
+      const texto = res[0].transcript;
+      voz.oido = texto;
+      mostrarMonitorVoz(texto, res.isFinal);
+      if (!res.isFinal || i <= procesadoHasta) continue;
+      procesadoHasta = i;
+      const clave = texto.trim().toLowerCase();
+      const ahora = Date.now();
+      const repetido = clave === ultimoFinal.texto && ahora - ultimoFinal.t < 1200;
+      ultimoFinal = { texto: clave, t: ahora };
+      if (repetido) continue;
+      huboFinal = true;
+      procesarVoz(texto);
+      if (rec !== r) return;
+    }
+    if (!huboFinal) pintarVoz();
   };
 
   r.onerror = e => {

@@ -284,18 +284,15 @@ export function agregarCodigoMesa(c, texto, aviso, ctx) {
   }
   if (!mesa) {
     const geos = geosDelAmbito(c);
-    if (geos.length !== 1) {
-      mesaPendiente = { cargo: c, codigo };
-      const msg = `Código ${codigo}: di el distrito al que pertenece.`;
-      if (ctx) ctx.voz.msg = msg;
-      if (aviso) aviso.textContent = msg;
-      ctx?.setConservarVoz(true);
-      ctx?.render();
-      return false;
-    }
-    mesa = { num: codigo, distrito: geos[0].distrito, local: `${geos[0].distrito} · ${codigo}`, hab: 0 };
-    S.mesas.push(mesa);
-    paginaPorCargo[c] = Math.floor((mesasTrabajo(c).length - 1) / MAX_MESAS_BLOQUE);
+    mesaPendiente = { cargo: c, codigo };
+    const msg = geos.length === 1
+      ? `El código ${codigo} no existe. Confírmalo para crearlo.`
+      : `Código ${codigo}: di el distrito al que pertenece.`;
+    if (ctx) ctx.voz.msg = msg;
+    if (aviso) aviso.textContent = msg;
+    ctx?.setConservarVoz(true);
+    ctx?.render();
+    return false;
   }
   if (ctx?.voz.abierto && ctx.voz.c === c) {
     ctx.voz.m   = mesa || S.mesas.find(m => String(m.num) === codigo);
@@ -324,9 +321,18 @@ function crearControlMesa(c, ctx) {
 function selectorMesaPendiente(c, ctx) {
   if (!mesaPendiente || mesaPendiente.cargo !== c) return null;
   const geos = geosDelAmbito(c);
+  const texto = geos.length === 1
+    ? `El código ${mesaPendiente.codigo} no existe. ¿Crearlo?`
+    : `Código ${mesaPendiente.codigo}: indica su distrito.`;
   return h('div', { class: 'acciones' },
-    h('span', { class: 'nota' }, `Código ${mesaPendiente.codigo}: indica su distrito.`),
-    ...geos.map(g => btn(g.distrito, () => confirmarMesaPendiente(g, ctx))),
+    h('span', { class: 'nota' }, texto),
+    ...geos.map(g => btn(geos.length === 1 ? `Crear en ${g.distrito}` : g.distrito,
+                         () => confirmarMesaPendiente(g, ctx))),
+    btn('Cancelar', () => {
+      mesaPendiente = null;
+      ctx?.setConservarVoz(true);
+      ctx?.render();
+    }),
   );
 }
 

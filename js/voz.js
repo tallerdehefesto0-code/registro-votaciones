@@ -88,7 +88,7 @@ export function normalizarFonetica(texto) {
 // ─────────────────────────────────────────────────────────────────────────────
 const DISTRITO_ERRORES = {
   // ── Íllimo ──────────────────────────────────────────────────────────────
-  [normalizarFonetica('Illimo')]:   ['hilimo', 'minimo', 'ilimo', 'iimo'],
+  [normalizarFonetica('Illimo')]:   ['hilimo', 'minimo', 'ilimo', 'iimo', 'yimo', 'elimo', 'ilemo', 'hilemo'],
 
   // ── Pacora ──────────────────────────────────────────────────────────────
   [normalizarFonetica('Pacora')]:   ['atora', 'tacora', 'bacora'],
