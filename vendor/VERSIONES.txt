@@ -1,0 +1,4 @@
+Librerías incluidas en la app (licencia MIT), copiadas de npm para que funcionen sin internet:
+- exceljs 4.4.0 (exceljs.min.js)
+- jspdf 4.2.1 (jspdf.umd.min.js)
+- jspdf-autotable 5.0.8 (jspdf.plugin.autotable.min.js)
