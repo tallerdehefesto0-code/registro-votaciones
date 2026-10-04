@@ -275,15 +275,12 @@ function iniciarVoz(automatico = false) {
   r.onerror = e => {
     if (rec !== r) return;
     if (['not-allowed', 'service-not-allowed'].includes(e.error)) {
-      detenerEscucha(); voz.msg = 'El micrófono no tiene permiso. Toca el candado junto a la dirección, elige Permitir y recarga.';
+      detenerEscucha(); voz.msg = 'El micrófono no tiene permiso.';
     } else if (e.error === 'network') {
       const demora = RETRASOS_RED[Math.min(reintentoRed, RETRASOS_RED.length - 1)];
       reintentoRed++;
       if (reintentoRed > 3) voz.msg = 'La conexión de voz está intermitente; seguiré reintentando.';
       reintentarEn(demora);
-    }
-    else if (!['no-speech', 'aborted'].includes(e.error)) {
-      voz.msg = `Error de micrófono: ${e.error}.`;
     }
     pintarVoz();
   };
