@@ -39,6 +39,15 @@ export const geoData = [
           'PITIPO', 'PUEBLO NUEVO',
         ],
       },
+      { 
+        nombre: 'CHICLAYO', 
+        distritos: [
+          'CHICLAYO', 'CAYALTI', 'CHONGOYAPE', 'ETEN', 'ETEN PUERTO', 
+          'JOSE LEONARDO ORTIZ', 'LA VICTORIA', 'LAGUNAS', 'MONSEFU', 
+          'NUEVA ARICA', 'OYOTUN', 'PATAPO', 'PICSI', 'PIMENTEL', 
+          'POMALCA', 'PUCALA', 'REQUE', 'SANTA ROSA', 'SAÑA', 'TUMAN'
+        ] 
+      },
     ],
   },
 ];
@@ -58,11 +67,11 @@ export const geografiaInicial = () =>
 
 // ─── Estado vacío ─────────────────────────────────────────────────────────────
 export const vacio = () => ({
-  orgs:     { distrito: [], provincia: [], region: [], consejero: [] },
-  mesas:    [],
-  votos:    {},
+  orgs: { distrito: [], provincia: [], region: [], consejero: [] },
+  mesas: [],
+  votos: {},
   cerradas: {},
-  log:      [],
+  log: [],
   geografia: geografiaInicial(),
 });
 
@@ -115,15 +124,15 @@ export function asegurarGeografia() {
     .filter(g => g.region && g.provincia && g.distrito)
     .map(g => ({
       ...g,
-      capital:  !!g.capital,
-      codigos:  Array.isArray(g.codigos) ? g.codigos.filter(c => /^\d{6}$/.test(c)) : [],
+      capital: !!g.capital,
+      codigos: Array.isArray(g.codigos) ? g.codigos.filter(c => /^\d{6}$/.test(c)) : [],
     }));
 
   // Renumerar códigos de mesa al formato de 6 dígitos
   const renumerar = {};
   S.mesas.forEach(m => {
     const original = String(m.num);
-    const codigo   = /^\d{1,6}$/.test(original) ? original.padStart(6, '0') : original;
+    const codigo = /^\d{1,6}$/.test(original) ? original.padStart(6, '0') : original;
     if (/^\d{6}$/.test(codigo)) {
       renumerar[original] = codigo;
       m.num = codigo;

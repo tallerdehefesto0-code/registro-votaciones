@@ -245,3 +245,8 @@ summary{cursor:pointer;color:var(--pri);font-weight:600}
 .sesion button:disabled{opacity:.6;cursor:wait}
 .sesion-nombre{max-width:10rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sesion-error{font-size:.75rem;font-weight:600}
+
+/* Datos: botones de "Agregar mesa" y "Agregar organización" al mismo nivel */
+.grid .card:has(form.form){display:flex;flex-direction:column}
+.grid .card:has(form.form) form.form{display:flex;flex-direction:column;flex:1}
+.grid .card:has(form.form) form.form button[type=submit]{margin-top:auto}

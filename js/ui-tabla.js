@@ -330,13 +330,22 @@ function comandosVoz() {
 }
 
 function formOrgRapida(c, ctx) {
-  const n   = h('input', { type: 'number', min: '1', inputmode: 'numeric', placeholder: 'N.º', 'aria-label': 'Número de la organización en la cédula' });
-  const nom = h('input', { placeholder: 'Nombre (opcional)', 'aria-label': 'Nombre de la organización' });
-  const msg = h('span', { class: 'mal' });
-  return h('details', {},
-    h('summary', {}, 'Agregar organización a esta tabla'),
-    h('div', { class: 'acciones' }, n, nom,
-      btn('Agregar', () => agregarOrganizacion(c, n.value, nom.value, msg, ctx)), msg),
+  const nom   = h('input', { placeholder: 'Nombre de la organización', autocomplete: 'off',
+    'aria-label': 'Nombre de la organización' });
+  const aviso = h('p', { class: 'mal' });
+  return h('form', { class: 'acciones', onsubmit: e => {
+      e.preventDefault();
+      const nombre = nom.value.trim();
+      if (!nombre) { aviso.textContent = 'Escribe el nombre de la organización.'; return; }
+      const terr = territorioActivo(c);
+      const sig  = S.orgs[c].filter(o => o.territorio === terr)
+                            .reduce((mx, o) => Math.max(mx, o.n), 0) + 1;
+      if (ctx?.voz?.abierto) ctx.setConservarVoz(true);
+      agregarOrganizacion(c, String(sig), nombre, aviso, ctx);
+    } },
+    nom,
+    h('button', { type: 'submit' }, 'Agregar organización'),
+    aviso,
   );
 }
 
@@ -386,9 +395,12 @@ function crearControlMesa(c, ctx) {
     maxlength: 6, required: true, placeholder: '123456', 'aria-label': 'Código de mesa',
   });
   const aviso = h('p', { class: 'mal' });
-  return h('form', { class: 'acciones',
-    onsubmit: e => { e.preventDefault(); agregarCodigoMesa(c, codigo.value, aviso, ctx); },
-  }, codigo, h('button', { type: 'submit' }, 'Agregar columna'), aviso);
+  return h('div', {},
+    h('form', { class: 'acciones',
+      onsubmit: e => { e.preventDefault(); agregarCodigoMesa(c, codigo.value, aviso, ctx); },
+    }, codigo, h('button', { type: 'submit' }, 'Agregar columna'), aviso),
+    formOrgRapida(c, ctx),
+  );
 }
 
 function selectorMesaPendiente(c, ctx) {
@@ -618,7 +630,7 @@ export function tabla(c, ctx, descargar) {
     FORMATOS('tabla').map(([t, id]) => [t, id, () => ({ cargo: c, territorio })]));
 
   return h('section', { class: 'vista-cargo' },
-    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, panel, formOrgRapida(c, ctx), comandosVoz(),
+    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, panel, comandosVoz(),
     h('div', { class: 'scroll tabla-scroll' },
       h('table', { class: 'tabla-votacion' },
         h('thead', {}, h('tr', {},
