@@ -9,7 +9,7 @@ import * as api          from './drive-api.js';
 import { eleccionActual, crearEleccion, elegirEleccion, olvidarEleccion,
          estructura, guardarJSON } from './drive-store.js';
 import { elegirArchivos } from './drive-picker.js';
-import { armarRespaldo } from './ui-avances.js';
+import { armarRespaldo, panelAvances } from './ui-avances.js';
 
 // Último mensaje: vive en el módulo para sobrevivir a los re-render.
 let salida = 'Sin acciones todavía.';
@@ -119,7 +119,7 @@ export function drive(render) {
         btn('Probar escritura y lectura', accion(probarAcceso), { disabled: !puede || !e }),
       ),
     ),
-
+    
     h('div', { class: 'card' },
       h('h3', {}, 'Mi avance'),
       h('p', { class: 'nota' }, 'Sube una copia de tus datos a la carpeta compartida. Es un solo archivo por persona y se sobrescribe cada vez.'),
@@ -127,6 +127,8 @@ export function drive(render) {
         btn('Guardar mi avance', accion(guardarAvance), { disabled: !puede || !e }),
       ),
     ),
+    
+    panelAvances(render),
 
     pre,
   );

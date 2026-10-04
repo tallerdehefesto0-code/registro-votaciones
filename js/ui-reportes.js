@@ -8,7 +8,6 @@ import { st, setEstado, save, asegurarGeografia } from './state.js';
 import { leerRespaldo }                        from './exportar.js';
 import { h }                                   from './ui-helpers.js';
 import { mkPanelExp, mkBotonExp, mkOpciones }  from './ui-tablero.js';
-import { panelAvances }                        from './ui-avances.js';
 
 const CS = Object.keys(CARGOS);
 
@@ -97,8 +96,7 @@ export function reportes(descargar, render) {
         null,
         h('div', {}, h('div', { class: 'acciones' }, restaurar), msgR),
       ),
-    ),                                    
-    panelAvances(render),    
+    ),                      
     h('p', { class: 'nota' }, 'Para exportar la tabla de un cargo o el tablero, usa el botón «Exportar» de esa pantalla.'),
   );
 }
