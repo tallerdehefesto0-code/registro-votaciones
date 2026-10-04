@@ -13,8 +13,23 @@ const F = ['./', 'index.html', 'manifest.json', 'css/styles.css',
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(V).then(c => c.addAll(F))); });
 self.addEventListener('activate', e => e.waitUntil(
   caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => clients.claim())));
+let sinRedHasta = 0; 
+const ESPERA_RED = 3000;
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
-  e.respondWith(fetch(e.request).then(r => { const copia = r.clone(); caches.open(V).then(c => c.put(e.request, copia)); return r; })
-    .catch(() => caches.match(e.request)));
+  e.respondWith((async () => {
+    if (Date.now() < sinRedHasta) {
+      const guardada = await caches.match(e.request);
+      if (guardada) return guardada;
+    }
+    const red = fetch(e.request).then(r => {
+      if (r.ok) { const copia = r.clone(); caches.open(V).then(c => c.put(e.request, copia)); }
+      return r;
+    });
+    red.catch(() => {});   // evita avisos de error no atendido si solo se usa la copia
+    const r = await Promise.race([red.catch(() => null), new Promise(res => setTimeout(res, ESPERA_RED, null))]);
+    if (r) return r;
+    sinRedHasta = Date.now() + 60000;
+    return (await caches.match(e.request)) || red;   // sin copia: esperar a la red como antes
+  })());
 });
