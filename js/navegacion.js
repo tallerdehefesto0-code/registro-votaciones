@@ -17,6 +17,44 @@ export const navegacionCargo = {};
 // Devuelve (creando si no existe) el contexto de navegación del cargo.
 export const contextoDe = c => navegacionCargo[c] ??= { region: '', provincia: '', distrito: '' };
 
+const CLAVE_UI = 'votaciones.ui';
+const CARGOS_UI = ['distrito', 'provincia', 'region', 'consejero'];
+
+export function restaurarNavegacionUI() {
+  try {
+    const ui = JSON.parse(localStorage.getItem(CLAVE_UI) || '{}');
+    const guardada = ui?.navegacionCargo;
+    if (!guardada || typeof guardada !== 'object' || Array.isArray(guardada)) return;
+    const geos = Array.isArray(st.S.geografia) ? st.S.geografia : [];
+
+    for (const c of CARGOS_UI) {
+      const anterior = guardada[c];
+      if (!anterior || typeof anterior !== 'object' || Array.isArray(anterior)) continue;
+      const region = typeof anterior.region === 'string' &&
+        geos.some(g => g.region === anterior.region) ? anterior.region : '';
+      const provincia = region && typeof anterior.provincia === 'string' &&
+        geos.some(g => g.region === region && g.provincia === anterior.provincia)
+        ? anterior.provincia : '';
+      const distrito = provincia && typeof anterior.distrito === 'string' &&
+        geos.some(g => g.region === region && g.provincia === provincia && g.distrito === anterior.distrito)
+        ? anterior.distrito : '';
+      navegacionCargo[c] = { region, provincia, distrito };
+    }
+  } catch {}
+}
+
+export function guardarNavegacionUI() {
+  try {
+    const anterior = JSON.parse(localStorage.getItem(CLAVE_UI) || '{}');
+    const ui = anterior && typeof anterior === 'object' && !Array.isArray(anterior) ? anterior : {};
+    ui.navegacionCargo = Object.fromEntries(
+      CARGOS_UI.filter(c => navegacionCargo[c])
+        .map(c => [c, { ...navegacionCargo[c] }])
+    );
+    localStorage.setItem(CLAVE_UI, JSON.stringify(ui));
+  } catch {}
+}
+
 // ─── Territorio activo según el tipo de cargo ─────────────────────────────────
 // - 'distrito'  → usa el distrito seleccionado
 // - 'region'    → usa la región seleccionada

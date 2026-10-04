@@ -606,7 +606,7 @@ export function tabla(c, ctx, descargar) {
     FORMATOS('tabla').map(([t, id]) => [t, id, () => ({ cargo: c, territorio })]));
 
   return h('section', { class: 'vista-cargo' },
-    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, buscador, panel, comandosVoz(),
+    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, buscador, panel,
     h('div', { class: 'scroll tabla-scroll' },
       h('table', { class: 'tabla-votacion' },
         h('thead', {}, h('tr', {},

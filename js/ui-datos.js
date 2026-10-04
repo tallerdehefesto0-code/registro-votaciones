@@ -41,11 +41,12 @@ let datosVista = 'general';
 
 // Paginación y búsqueda por tabla. Vive fuera de datos() para que, al editar una
 // fila y volver a renderizar, se conserve la página y el texto buscado.
-const POR_PAGINA = 50;
+const POR_PAGINA = 10;
 const listado = {
   mesas: { q: '', pag: 0 },
   orgs:  { q: '', pag: 0 },
 };
+const detalleAbierto = { mesas: false, orgs: false };
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 const fecha = t => new Date(t).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
@@ -471,32 +472,112 @@ export function datos(render) {
     h('div', { class: 'grid' },
       carga('Organizaciones (CSV / JSON)', 'orgs',  msgO, 'plantilla-organizaciones.csv'),
       carga('Catálogo de mesas (CSV / JSON)', 'mesas', msgM, 'plantilla-mesas.csv'),
-      !bloq && card('Agregar una mesa', formMesa),
-      !bloq && card('Agregar una organización', formOrg),
+      !bloq && h('section', { class: 'card form-card' },
+        h('h3', {}, 'Agregar una mesa'), formMesa),
+      !bloq && h('section', { class: 'card form-card' },
+        h('h3', {}, 'Agregar una organización'), formOrg),
     ),
-    // Tabla de mesas cargadas (paginada y con búsqueda)
-    card('Mesas cargadas',
-      tablaPaginada({
-        clave:       'mesas',
-        placeholder: 'Buscar mesa por código, distrito o local…',
-        claseTabla:  'tabla-admin mesas-admin',
-        columnas:    ['Código', 'Distrito', 'Local', 'Electores', ''],
-        items:       S.mesas,
-        texto:       m => `${m.num} ${m.distrito || ''} ${m.local || ''}`,
-        fila:        filaMesa,
-      })
-    ),
-    // Tabla de organizaciones cargadas (paginada y con búsqueda)
-    card('Organizaciones cargadas',
-      tablaPaginada({
-        clave:       'orgs',
-        placeholder: 'Buscar organización por cargo, territorio, número, nombre o candidato…',
-        claseTabla:  'tabla-admin organizaciones-admin',
-        columnas:    ['Cargo', 'Territorio', 'N.º', 'Organización', 'Candidato', ''],
-        items:       CS.flatMap(c => S.orgs[c].map(o => ({ c, o }))),
-        texto:       ({ c, o }) => `${CARGOS[c]} ${o.territorio || ''} ${o.n} ${o.nombre} ${o.cand || ''}`,
-        fila:        filaOrg,
-      })
-    ),
+
+    // Resumen de mesas; la tabla editable se monta solo cuando se solicita.
+    (() => {
+      const porDistrito = new Map();
+      S.mesas.forEach(m => {
+        const distrito = m.distrito || 'Sin distrito';
+        const resumen = porDistrito.get(distrito) || { mesas: 0, hab: 0 };
+        resumen.mesas++;
+        const hab = Number(m.hab);
+        if (Number.isFinite(hab)) resumen.hab += hab;
+        porDistrito.set(distrito, resumen);
+      });
+      const distritos = new Set(S.mesas.map(m => m.distrito).filter(Boolean)).size;
+      const habiles = S.mesas.reduce((total, m) => {
+        const hab = Number(m.hab);
+        return total + (Number.isFinite(hab) ? hab : 0);
+      }, 0);
+      const sinHabiles = S.mesas.filter(m =>
+        m.hab == null || String(m.hab).trim() === '' ||
+        !Number.isFinite(Number(m.hab)) || Number(m.hab) <= 0
+      ).length;
+      const filasResumen = [...porDistrito.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, 'es'))
+        .map(([distrito, r]) => h('tr', {},
+          h('th', {}, distrito), h('td', {}, String(r.mesas)), h('td', {}, String(r.hab))
+        ));
+      return card('Mesas cargadas',
+        h('div', { class: 'cifras' },
+          h('div', {}, h('b', {}, String(S.mesas.length)), h('span', {}, 'Mesas')),
+          h('div', {}, h('b', {}, String(distritos)), h('span', {}, 'Distritos')),
+          h('div', {}, h('b', {}, habiles.toLocaleString('es-PE')), h('span', {}, 'Electores hábiles')),
+          h('div', {}, h('b', {}, String(sinHabiles)), h('span', {}, 'Mesas sin electores')),
+        ),
+        h('div', { class: 'scroll' },
+          h('table', { class: 'izq' },
+            h('thead', {}, h('tr', {},
+              h('th', {}, 'Distrito'), h('th', {}, 'Mesas'), h('th', {}, 'Electores hábiles')
+            )),
+            h('tbody', {}, ...(filasResumen.length ? filasResumen : [
+              h('tr', {}, h('th', {}, 'Sin mesas cargadas'), h('td', {}, '0'), h('td', {}, '0'))
+            ])),
+          ),
+        ),
+        btn(detalleAbierto.mesas ? 'Ocultar' : 'Ver y editar mesas', () => {
+          detalleAbierto.mesas = !detalleAbierto.mesas; render();
+        }),
+        detalleAbierto.mesas && tablaPaginada({
+          clave: 'mesas',
+          placeholder: 'Buscar mesa por código, distrito o local…',
+          claseTabla: 'tabla-admin mesas-admin',
+          columnas: ['Código', 'Distrito', 'Local', 'Electores', ''],
+          items: S.mesas,
+          texto: m => `${m.num} ${m.distrito || ''} ${m.local || ''}`,
+          fila: filaMesa,
+        }),
+      );
+    })(),
+
+    // Resumen de organizaciones; el detalle editable se monta al abrirlo.
+    (() => {
+      const porCargoTerritorio = new Map();
+      CS.forEach(c => S.orgs[c].forEach(o => {
+        const territorio = o.territorio || 'Sin territorio';
+        const clave = `${c}\u0000${territorio}`;
+        const resumen = porCargoTerritorio.get(clave) || {
+          cargo: CARGOS[c], territorio, cantidad: 0,
+        };
+        resumen.cantidad++;
+        porCargoTerritorio.set(clave, resumen);
+      }));
+      const filasResumen = [...porCargoTerritorio.values()]
+        .sort((a, b) => a.cargo.localeCompare(b.cargo, 'es') || a.territorio.localeCompare(b.territorio, 'es'))
+        .map(r => h('tr', {},
+          h('td', {}, r.cargo), h('td', {}, r.territorio), h('td', {}, String(r.cantidad))
+        ));
+      const total = CS.reduce((n, c) => n + S.orgs[c].length, 0);
+      return card('Organizaciones cargadas',
+        h('p', {}, h('strong', {}, `Total: ${total}`)),
+        h('div', { class: 'scroll' },
+          h('table', { class: 'izq' },
+            h('thead', {}, h('tr', {},
+              h('th', {}, 'Cargo'), h('th', {}, 'Territorio'), h('th', {}, 'Organizaciones')
+            )),
+            h('tbody', {}, ...(filasResumen.length ? filasResumen : [
+              h('tr', {}, h('td', {}, 'Sin organizaciones'), h('td', {}, '—'), h('td', {}, '0'))
+            ])),
+          ),
+        ),
+        btn(detalleAbierto.orgs ? 'Ocultar' : 'Ver y editar organizaciones', () => {
+          detalleAbierto.orgs = !detalleAbierto.orgs; render();
+        }),
+        detalleAbierto.orgs && tablaPaginada({
+          clave: 'orgs',
+          placeholder: 'Buscar organización por cargo, territorio, número, nombre o candidato…',
+          claseTabla: 'tabla-admin organizaciones-admin',
+          columnas: ['Cargo', 'Territorio', 'N.º', 'Organización', 'Candidato', ''],
+          items: CS.flatMap(c => S.orgs[c].map(o => ({ c, o }))),
+          texto: ({ c, o }) => `${CARGOS[c]} ${o.territorio || ''} ${o.n} ${o.nombre} ${o.cand || ''}`,
+          fila: filaOrg,
+        }),
+      );
+    })(),
   );
 }

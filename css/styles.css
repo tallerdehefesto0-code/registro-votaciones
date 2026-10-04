@@ -27,7 +27,8 @@ nav a svg{width:18px;height:18px;flex:none}
 nav a:hover{background:rgba(255,255,255,.18);color:#fff}
 nav a.on{background:#fff;color:var(--pri);box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .banner{background:var(--soft2);color:var(--pri-d);font-size:.8rem;padding:.4rem 1.2rem;border-bottom:1px solid var(--soft3);text-align:center}
-main{padding:1.2rem;max-width:1120px;margin:auto}
+main{width:100%;max-width:1200px;min-width:0;margin-inline:auto;padding:1.2rem}
+main>*{min-width:0}
 
 /* Tablas */
 .scroll{overflow-x:auto;border:1px solid var(--line2);border-radius:var(--r);background:#fff;box-shadow:var(--sombra)}
@@ -114,7 +115,7 @@ td button{width:100%;font-size:.85rem;padding:.4rem .5rem;margin-top:.35rem}
 .vista-cargo .voz [data-k="voido"]{min-height:1.45em;overflow-wrap:anywhere}
 .vista-cargo .voz [data-k="vayuda"]{min-height:1.4em;margin:.25rem 0}
 .vista-cargo>[data-k="nota"]{min-height:1.5em;margin:.25rem 0}
-.vista-cargo .panel-voz{position:sticky;top:4rem;z-index:10;align-self:start;background:#fff}
+.vista-cargo .panel-voz{align-self:start;background:#fff}
 .tabs-datos{display:flex;align-items:center;gap:.5rem;margin:.5rem 0 .75rem}
 .tabs-datos button{height:2.75rem;min-height:2.75rem;flex:0 1 15rem;padding:.5rem .9rem}
 
@@ -247,7 +248,8 @@ summary{cursor:pointer;color:var(--pri);font-weight:600}
 .sesion-nombre{max-width:10rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sesion-error{font-size:.75rem;font-weight:600}
 
-/* Datos: botones de "Agregar mesa" y "Agregar organización" al mismo nivel */
-.grid .card:has(form.form){display:flex;flex-direction:column}
-.grid .card:has(form.form) form.form{display:flex;flex-direction:column;flex:1}
-.grid .card:has(form.form) form.form button[type=submit]{margin-top:auto}
+/* Datos: formularios uniformes en las dos tarjetas de alta */
+.grid .card.form-card{display:flex;flex-direction:column}
+.grid .card.form-card form.form{display:flex;flex-direction:column;align-items:stretch;flex:1;width:100%}
+.grid .card.form-card form.form>.campo{width:100%;text-align:left}
+.grid .card.form-card form.form>button[type=submit]{width:100%;min-height:2.75rem;margin-top:auto}
