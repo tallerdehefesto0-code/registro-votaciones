@@ -25,6 +25,7 @@ import { ctx, enlazarRender, pararVoz, pintarVoz,
          consumirConservarVoz }                                    from './voz-motor.js';
 import { iniciarAuth }   from './auth.js';
 import { montarSesion }  from './ui-sesion.js';
+import { cargarOficialesSiVacio } from './datos-oficiales.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTER Y RENDER
@@ -67,6 +68,8 @@ enlazarRender(render);
 (async () => {
   setEstado((await cargar()) || vacio());
   asegurarGeografia();
+  const ofi = await cargarOficialesSiVacio();
+  console.info(ofi.msg);
   iniciarAuth();
   montarSesion(document.getElementById('sesion'));
   await save();

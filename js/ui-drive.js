@@ -9,6 +9,7 @@ import * as api          from './drive-api.js';
 import { eleccionActual, crearEleccion, elegirEleccion, olvidarEleccion,
          estructura, guardarJSON } from './drive-store.js';
 import { elegirArchivos } from './drive-picker.js';
+import { armarRespaldo } from './ui-avances.js';
 
 // Último mensaje: vive en el módulo para sobrevivir a los re-render.
 let salida = 'Sin acciones todavía.';
@@ -73,6 +74,16 @@ export function drive(render) {
     return lineas.join('\n');
   };
 
+  const guardarAvance = async () => {
+    if (!u || !u.email) throw new Error('Inicia sesión con Google para guardar el avance.');
+    const { eleccion } = await estructura();
+    const nombre = `avance-${u.email}.json`;
+    const r = armarRespaldo();
+    const nuevo = await guardarJSON(eleccion.id, nombre, r);
+    const cierres = Object.values(r.estado.cerradas).filter(Boolean).length;
+    return `Avance guardado: ${nombre} (v${nuevo.version}).\nContenido: ${Object.keys(r.estado.votos).length} votos, ${cierres} cierres.`;
+  };
+
   return h('section', {},
     h('h2', {}, 'Google Drive'),
     h('p', { class: 'nota' }, u
@@ -106,6 +117,14 @@ export function drive(render) {
           return r ? `Archivos autorizados: ${r.map(x => x.nombre).join(', ')}\nPulsa "Ver contenido" para comprobarlo.` : 'Selección cancelada.';
         }), { disabled: !puede || !e }),
         btn('Probar escritura y lectura', accion(probarAcceso), { disabled: !puede || !e }),
+      ),
+    ),
+
+    h('div', { class: 'card' },
+      h('h3', {}, 'Mi avance'),
+      h('p', { class: 'nota' }, 'Sube una copia de tus datos a la carpeta compartida. Es un solo archivo por persona y se sobrescribe cada vez.'),
+      h('div', { class: 'acciones' },
+        btn('Guardar mi avance', accion(guardarAvance), { disabled: !puede || !e }),
       ),
     ),
 

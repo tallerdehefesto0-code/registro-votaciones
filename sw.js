@@ -1,5 +1,5 @@
 // Service worker: intenta la red primero y guarda copia; sin internet usa la copia guardada.
-const V = 'votaciones-d6';
+const V = 'votaciones-d7';
 const F = ['./', 'index.html', 'manifest.json', 'css/styles.css',
   'js/app.js', 'js/calc.js', 'js/csv.js', 'js/db.js', 'js/excel.js', 'js/exportar.js', 'js/informes.js',
   'js/navegacion.js', 'js/pdf.js', 'js/seed.js', 'js/state.js',
@@ -7,6 +7,8 @@ const F = ['./', 'index.html', 'manifest.json', 'css/styles.css',
   'js/voz-motor.js', 'js/voz.js',
   'js/auth.js', 'js/config.js', 'js/ui-sesion.js',
   'js/drive-api.js', 'js/drive-picker.js', 'js/drive-store.js', 'js/ui-drive.js',
+  'js/ui-avances.js', 'js/combinar.js', 'js/datos-oficiales.js',
+  'datos/mesas-lambayeque.csv', 'datos/organizaciones-lambayeque-ferrenafe.csv','datos/organizaciones-chiclayo.csv',
   'vendor/exceljs.min.js', 'vendor/jspdf.umd.min.js', 'vendor/jspdf.plugin.autotable.min.js', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(V).then(c => c.addAll(F))); });
 self.addEventListener('activate', e => e.waitUntil(

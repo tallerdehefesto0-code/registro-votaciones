@@ -3,21 +3,25 @@
 // cuándo hacer save(), render() y registrarEvento().
 //
 // Entrada: el "estado" de un respaldo (el que devuelve leerRespaldo en informes.js):
-//   { orgs, mesas, votos, cerradas, log, ... }
+//   { orgs, mesas, votos, cerradas, log, geografia, ... }
 //
 // Reglas:
 //   • Lo que solo existe en uno de los lados se incorpora.
 //   • Si el mismo dato existe en ambos con el mismo valor, no se hace nada.
 //   • Si el mismo dato existe con valores distintos, NO se pisa: va a la lista de conflictos.
 //   • Un cierre de mesa en cualquiera de los lados se conserva (se unen).
+//   • Limitación conocida: si una mesa se REABRIÓ en un lado, al unir vuelve a quedar cerrada.
 
 const ev = e => [e.t, e.cargo, e.mesa, e.evento, e.usuario || ''].join('|');
 
 export function combinar(S, otro) {
   const r = { mesas: 0, orgs: 0, votos: 0, cerradas: 0, log: 0, conflictos: [] };
 
+  // Por si el estado local no trae alguna sección (evita errores al agregar)
+  S.mesas ||= []; S.orgs ||= {}; S.votos ||= {}; S.cerradas ||= {}; S.log ||= []; S.geografia ||= [];
+
   // Mesas
-  const porNum = new Map((S.mesas || []).map(m => [String(m.num), m]));
+  const porNum = new Map(S.mesas.map(m => [String(m.num), m]));
   (otro.mesas || []).forEach(m => {
     const n = String(m.num), mine = porNum.get(n);
     if (!mine) { const nueva = { ...m, num: n }; S.mesas.push(nueva); porNum.set(n, nueva); r.mesas++; return; }
@@ -27,6 +31,12 @@ export function combinar(S, otro) {
     else if (mine.hab > 0 && m.hab > 0 && mine.hab !== m.hab)
       r.conflictos.push({ tipo: 'mesa-hab', clave: n, actual: mine.hab, nuevo: m.hab });
     if (!mine.local && m.local) mine.local = m.local;
+  });
+
+  // Geografía: se incorporan los distritos que el otro lado tenga y aquí falten
+  // (sin esto, una mesa nueva quedaría con un distrito inexistente y un respaldo posterior sería rechazado).
+  (otro.geografia || []).forEach(g => {
+    if (!S.geografia.some(x => x.distrito === g.distrito)) S.geografia.push({ ...g });
   });
 
   // Organizaciones (clave: cargo + territorio + número)
@@ -53,7 +63,7 @@ export function combinar(S, otro) {
   });
 
   // Bitácora (sin duplicar eventos)
-  const vistos = new Set((S.log || []).map(ev));
+  const vistos = new Set(S.log.map(ev));
   (otro.log || []).forEach(e => { if (!vistos.has(ev(e))) { S.log.push(e); vistos.add(ev(e)); r.log++; } });
   S.log.sort((a, b) => String(a.t).localeCompare(String(b.t)));
 
