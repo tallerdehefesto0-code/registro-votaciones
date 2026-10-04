@@ -107,6 +107,29 @@ export function asegurarGeografia() {
   const S = st.S;
   const anterior = Array.isArray(S.geografia) ? S.geografia : [];
   const base = geografiaInicial();
+  const mesas = Array.isArray(S.mesas) ? S.mesas : [];
+  const votos = Object.keys(S.votos || {});
+  const organizaciones = Object.values(S.orgs || {}).flatMap(xs => Array.isArray(xs) ? xs : []);
+  const normalizarCodigo = n => {
+    const texto = String(n);
+    return /^\d{1,6}$/.test(texto) ? texto.padStart(6, '0') : texto;
+  };
+  const coincideCodigo = (a, b) =>
+    String(a) === String(b) || normalizarCodigo(a) === normalizarCodigo(b);
+  const geosConocidas = [...base, ...anterior];
+  const mesaApuntaAGeo = (m, g) =>
+    m.distrito === g.distrito ||
+    String(m.local || '').startsWith(g.distrito + ' · ') ||
+    (Array.isArray(g.codigos) && g.codigos.some(c => coincideCodigo(c, m.num)));
+  const hayVotosSinUbicacion = votos.some(clave => {
+    const codigo = clave.split('|')[1];
+    const mesa = mesas.find(m => coincideCodigo(m.num, codigo));
+    return !mesa || !geosConocidas.some(g => mesaApuntaAGeo(mesa, g));
+  });
+  const tieneReferencia = g =>
+    hayVotosSinUbicacion ||
+    mesas.some(m => mesaApuntaAGeo(m, g)) ||
+    organizaciones.some(o => [g.distrito, g.provincia, g.region].includes(o.territorio));
 
   S.geografia = [
     ...base.map(g => ({
@@ -118,7 +141,7 @@ export function asegurarGeografia() {
     ...anterior.filter(
       x => !base.some(
         g => g.region === x.region && g.provincia === x.provincia && g.distrito === x.distrito
-      )
+      ) && tieneReferencia(x)
     ),
   ]
     .filter(g => g.region && g.provincia && g.distrito)

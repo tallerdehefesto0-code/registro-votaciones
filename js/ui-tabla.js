@@ -341,26 +341,6 @@ function comandosVoz() {
   );
 }
 
-function formOrgRapida(c, ctx) {
-  const nom   = h('input', { placeholder: 'Nombre de la organización', autocomplete: 'off',
-    'aria-label': 'Nombre de la organización' });
-  const aviso = h('p', { class: 'mal' });
-  return h('form', { class: 'acciones', onsubmit: e => {
-      e.preventDefault();
-      const nombre = nom.value.trim();
-      if (!nombre) { aviso.textContent = 'Escribe el nombre de la organización.'; return; }
-      const terr = territorioActivo(c);
-      const sig  = S.orgs[c].filter(o => o.territorio === terr)
-                            .reduce((mx, o) => Math.max(mx, o.n), 0) + 1;
-      if (ctx?.voz?.abierto) ctx.setConservarVoz(true);
-      agregarOrganizacion(c, String(sig), nombre, aviso, ctx);
-    } },
-    nom,
-    h('button', { type: 'submit' }, 'Agregar organización'),
-    aviso,
-  );
-}
-
 // ─── Buscador de mesas del catálogo ────────────────────────────────────────────
 export function agregarCodigoMesa(c, texto, aviso, ctx) {
   const codigo = String(texto).trim();
@@ -421,13 +401,13 @@ function crearControlMesa(c, ctx) {
     ctx.setConservarVoz(true);
     ctx.render();
     ctx.pintarVoz();
+    if (!ctx.voz.escuchando) ctx.alternarVoz();
   };
   return h('div', {},
     h('form', { class: 'acciones buscador-mesas',
       onsubmit: e => { e.preventDefault(); agregarCodigoMesa(c, codigo.value, aviso, ctx); },
     }, codigo, h('button', { type: 'submit' }, 'Ir'),
        h('button', { type: 'button', onclick: dictarVotantes }, 'Dictar votantes'), aviso),
-    formOrgRapida(c, ctx),
   );
 }
 

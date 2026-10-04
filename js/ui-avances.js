@@ -96,9 +96,14 @@ function nombreConflicto(c) {
 }
 
 export function panelAvances(render) {
-  const salida = h('pre', { class: 'msg' }, 'Sin acciones todavía.');
+  const salida = h('pre', { class: 'msg ok' }, 'Sin acciones todavía.');
   const detalle = h('div', {});
-  const decir = t => { salida.textContent = t; };
+  const esErrorMensaje = texto =>
+    /(?:^|\n)\s*(?:Error\b|✘)|\b(?:no se ve nada|no se pudo|fallo|falló|falla|conflicto)\b/i.test(String(texto));
+  const decir = t => {
+    salida.textContent = t;
+    salida.classList.toggle('ok', !esErrorMensaje(t));
+  };
 
   const mostrar = prep => {
     detalle.replaceChildren();

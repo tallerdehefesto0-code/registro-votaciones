@@ -208,8 +208,8 @@ function pestañasDatos(render) {
 function editarGeografia(render) {
   const aviso       = h('pre', { class: 'msg' });
   const hayCapturas = hayVotos(S);
-  const region   = h('input', { name: 'region',   required: true, value: 'Lambayeque' });
-  const provincia = h('input', { name: 'provincia', required: true, value: 'Lambayeque' });
+  const region   = h('input', { name: 'region',   required: true, value: 'LAMBAYEQUE' });
+  const provincia = h('input', { name: 'provincia', required: true, value: 'LAMBAYEQUE' });
   const distrito  = h('input', { name: 'distrito',  required: true });
   const capital   = h('input', { name: 'capital', type: 'checkbox' });
 

@@ -15,14 +15,21 @@ import { armarRespaldo, panelAvances } from './ui-avances.js';
 let salida = 'Sin acciones todavía.';
 
 const fecha = iso => (iso ? new Date(iso).toLocaleString('es-PE') : '—');
+const esErrorMensaje = texto =>
+  /(?:^|\n)\s*(?:Error\b|✘)|\b(?:no se ve nada|no se pudo|fallo|falló|falla|conflicto)\b/i.test(String(texto));
+const claseMensaje = texto => esErrorMensaje(texto) ? 'msg' : 'msg ok';
 
 export function drive(render) {
   const u = usuarioActual();
   const e = eleccionActual();
   const puede = !!(u && u.drive);
 
-  const pre = h('pre', { class: 'msg' }, salida);
-  const decir = t => { salida = t; pre.textContent = t; };
+  const pre = h('pre', { class: claseMensaje(salida) }, salida);
+  const decir = t => {
+    salida = t;
+    pre.textContent = t;
+    pre.classList.toggle('ok', !esErrorMensaje(t));
+  };
 
   // Ejecuta una acción mostrando "Trabajando…" y traduciendo errores a texto.
   const accion = (fn, { redibujar = false } = {}) => async () => {
@@ -130,6 +137,6 @@ export function drive(render) {
     
     panelAvances(render),
 
-    pre,
+    salida !== 'Sin acciones todavía.' && pre,
   );
 }

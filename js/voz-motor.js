@@ -24,8 +24,7 @@ import { navegacionCargo, contextoDe, navegacionCompleta,
 import { h }                                                       from './ui-helpers.js';
 import { filasDe, mesasTrabajo, mesasVisibles,
          paginaPorCargo, setSel, actualizarTabla,
-         agregarCodigoMesa, MAX_MESAS_BLOQUE, getApp, 
-         agregarOrganizacion }                                     from './ui-tabla.js';
+         agregarCodigoMesa, MAX_MESAS_BLOQUE, getApp }             from './ui-tabla.js';
 import { setFiltroBit }                                            from './ui-bitacora.js';
 
 // ─── Acceso al estado ─────────────────────────────────────────────────────────
@@ -132,8 +131,8 @@ export function consumirConservarVoz() {
   return v;
 }
 
-// Detecta si se está entrando a un cargo por primera vez; en ese caso reinicia
-// su navegación territorial y paginación. Devuelve true si hay que abrir la voz.
+// Detecta si se está entrando a un cargo por primera vez; reinicia su navegación
+// territorial y paginación. Devuelve true si hay que abrir el panel de voz.
 export function prepararEntradaCargo(ruta, cargo) {
   if (ruta !== 'cargo') cargoAutoIniciado = '';
   const entrar = ruta === 'cargo' && !!CARGOS[cargo] && cargoAutoIniciado !== cargo;
@@ -315,18 +314,19 @@ const alternarVoz = () => {
 
 const irA = i => { voz.pos = Math.max(0, Math.min(filasDe(voz.c).length, i)); };
 
-export function abrirVozSinTerritorio(c) {
+export function abrirVozSinTerritorio(c, escuchar = true) {
   Object.assign(voz, {
     abierto: true, c, m: null, pos: 0, oido: '', msg: '',
     esperandoCodigo: false, digitosCodigo: '',
   });
-  conservarVoz = true; render(); iniciarVoz();
+  conservarVoz = true; render();
+  if (escuchar) iniciarVoz();
 }
 
 // Las organizaciones ya no se agregan por voz: con el catálogo oficial cargado, un
 // número mal oído cruzaría votos sin aviso. Se usa el formulario de la tabla.
 function agregarOrgPorVoz() {
-  voz.msg = 'Las organizaciones no se agregan por voz. Usa el formulario de la tabla.';
+  voz.msg = 'Las organizaciones se administran en la pestaña Datos.';
   pintarVoz();
 }
 
@@ -532,8 +532,7 @@ function seleccionarTerritorio(c, nombre) {
   if (!navegacionCompleta(c)) {
     voz.m   = null;
     voz.msg = `${etiquetaPaso(paso)} ${nombre}.`;
-    conservarVoz = true; render();
-    if (!voz.escuchando) iniciarVoz(); else pintarVoz();
+    conservarVoz = true; render(); pintarVoz();
     return;
   }
   // Navegación completa: posicionar en la primera mesa no cerrada
@@ -553,18 +552,15 @@ function seleccionarTerritorio(c, nombre) {
   voz.msg = ms.length
     ? `Distrito ${n.distrito} · ${ms.length} mesas en el bloque.`
     : `Distrito ${n.distrito} · plantilla lista.`;
-  conservarVoz = true; render();
-  if (!voz.escuchando) iniciarVoz(); else pintarVoz();
+  conservarVoz = true; render(); pintarVoz();
 }
 
 function volverSeleccionTerritorio(c) {
-  const estabaEscuchando    = voz.escuchando;
   navegacionCargo[c]        = { region: '', provincia: '', distrito: '' };
   voz.m = null; voz.esperandoCodigo = false; voz.digitosCodigo = '';
   codigoPendiente           = null;
   paginaPorCargo[c]         = 0;
-  conservarVoz = true; render();
-  if (!estabaEscuchando) iniciarVoz();
+  conservarVoz = true; render(); pintarVoz();
 }
 
 function acumularDigitosCodigo(texto) {

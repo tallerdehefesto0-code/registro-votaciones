@@ -47,17 +47,19 @@ function render() {
 
   appEl.replaceChildren(vista);
 
+  const pestañaActiva = r === 'cargo' ? '#/' : location.hash || '#/';
+  document.querySelectorAll('nav a').forEach(l =>
+    l.classList.toggle('on', l.getAttribute('href') === pestañaActiva)
+  );
+
   if (entrarCargo) {
-    abrirVozSinTerritorio(a);
+    abrirVozSinTerritorio(a, false);
     return;
   }
   if (r === 'cargo' && CARGOS[a] && appEl.querySelector('table')) {
     actualizarTabla(a, false, ctx);
     pintarVoz();
   }
-  document.querySelectorAll('nav a').forEach(l =>
-    l.classList.toggle('on', l.getAttribute('href') === (location.hash || '#/'))
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,14 +67,24 @@ function render() {
 // ─────────────────────────────────────────────────────────────────────────────
 enlazarRender(render);
 
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')
+  .catch(err => console.error('No se pudo registrar el service worker:', err));
+
 (async () => {
-  setEstado((await cargar()) || vacio());
-  asegurarGeografia();
-  iniciarAuth();
-  montarSesion(document.getElementById('sesion'));
-  await save();
-  window.addEventListener('hashchange', render);
-  render();
-  cargarOficialesSiVacio().then(ofi => { console.info(ofi.msg); if (ofi.cargado) render(); });
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  try {
+    setEstado((await cargar()) || vacio());
+    asegurarGeografia();
+    iniciarAuth();
+    montarSesion(document.getElementById('sesion'));
+    await save();
+    window.addEventListener('hashchange', render);
+    render();
+    cargarOficialesSiVacio()
+      .then(ofi => { console.info(ofi.msg); if (ofi.cargado) render(); })
+      .catch(err => console.error('No se pudieron cargar los datos oficiales:', err));
+  } catch (err) {
+    const motivo = err?.message || String(err);
+    appEl.className = 'mal';
+    appEl.textContent = `No se pudo iniciar la aplicación: ${motivo}. Recarga la página`;
+  }
 })();
