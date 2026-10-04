@@ -58,6 +58,9 @@ export function resumenCargo(s, cargo, territorio = '') {
   };
 }
 
+export const mesaCerradaEnAlgunCargo = (s, mesa) =>
+  cargosDeMesa(s, mesa).some(c => !!s.cerradas?.[c + '|' + mesa.num]);
+
 // Regla 6: aviso (no bloqueo) si el Total por mesa difiere entre cargos ya completos. Devuelve [[cargo,total],...] o null
 export function avisoMesa(s, mesa) {
   const t = cargosDeMesa(s, mesa).map(c => [c, datosMesa(s, c, mesa)]).filter(([, d]) => d.completo).map(([c, d]) => [c, d.total]);

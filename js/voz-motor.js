@@ -13,10 +13,11 @@
 // `render` es de app.js; se recibe con enlazarRender(render) para evitar una
 // importación circular (voz-motor ↔ app). Nadie más importa este módulo.
 
-import { CARGOS, key as key_of, maxCelda }                         from './calc.js';
+import { CARGOS, key as key_of, maxCelda, errorHab,
+         mesaCerradaEnAlgunCargo }                                  from './calc.js';
 import { interpretar, coincideFonetico, coincideDistrito,
          leerDigitosDictados }                                     from './voz.js';
-import { st, save }                                                from './state.js';
+import { st, save, registrarEvento }                               from './state.js';
 import { navegacionCargo, contextoDe, navegacionCompleta,
          pasoNavegacion, etiquetaPaso, opcionesNavegacion,
          fraseAmbito, territorioActivo }                           from './navegacion.js';
@@ -312,7 +313,7 @@ const alternarVoz = () => {
   else iniciarVoz();
 };
 
-const irA = i => { voz.pos = Math.max(0, Math.min(filasDe(voz.c).length - 1, i)); };
+const irA = i => { voz.pos = Math.max(0, Math.min(filasDe(voz.c).length, i)); };
 
 export function abrirVozSinTerritorio(c) {
   Object.assign(voz, {
@@ -337,7 +338,33 @@ function proponer(v) {
     voz.msg = 'Selecciona primero Región, Provincia y Distrito de trabajo.';
     return pintarVoz();
   }
-  const max = maxCelda(S, voz.c, voz.m, filasDe(voz.c)[voz.pos][1]);
+  const fl = filasDe(voz.c);
+  if (voz.pos === fl.length) {
+    if (mesaCerradaEnAlgunCargo(S, voz.m)) {
+      voz.msg = 'Mesa cerrada: reábrela para cambiar los electores hábiles';
+      return pintarVoz();
+    }
+    const error = errorHab(S, voz.m, v);
+    if (error) {
+      voz.msg = error;
+      return pintarVoz();
+    }
+    const antes = voz.m.hab || 0;
+    voz.m.hab = v;
+    registrarEvento(voz.c, voz.m.num, `Electores hábiles: ${antes} → ${v}`);
+    save();
+    actualizarTabla(voz.c, true, ctx);
+    voz.msg = '';
+    const mesas = mesasTrabajo(voz.c);
+    const indice = mesas.findIndex(m => String(m.num) === String(voz.m.num));
+    if (indice >= mesas.length - 1) {
+      voz.msg = 'Última mesa. Revisa los totales y cierra la mesa.';
+      return pintarVoz();
+    }
+    navegarColumna(1);
+    return;
+  }
+  const max = maxCelda(S, voz.c, voz.m, fl[voz.pos][1]);
   if (v > max) {
     voz.msg = `${v} supera el máximo permitido (${max}) para esta casilla. Repite la cantidad.`;
     return pintarVoz();
@@ -351,13 +378,17 @@ function guardarValorVoz(v) {
   save();
   actualizarTabla(voz.c, true, ctx);
   voz.msg = '';
-  if (voz.pos < fl.length - 1) irA(voz.pos + 1);
-  else voz.msg = 'Última casilla guardada. Revisa los totales y cierra la mesa.';
+  irA(voz.pos + 1);
   pintarVoz();
 }
 
 function borrarCeldaVoz() {
-  const fl = filasDe(voz.c), x = fl[voz.pos][1];
+  const fl = filasDe(voz.c);
+  if (voz.pos === fl.length) {
+    voz.msg = 'Los electores hábiles no se borran por voz. Corrígelos en la casilla.';
+    return pintarVoz();
+  }
+  const x = fl[voz.pos][1];
   delete S.votos[key_of(voz.c, voz.m.num, x)];
   save();
   actualizarTabla(voz.c, true, ctx);
@@ -482,7 +513,8 @@ function navegarColumna(delta) {
   const nuevoIdx = nuevoGlobal % MAX_MESAS_BLOQUE;
   voz.m  = ms[nuevoIdx];
   setSel(nuevoIdx);
-  voz.pos = 0;
+  const vacia = filasDe(voz.c).findIndex(([, x]) => S.votos[key_of(voz.c, voz.m.num, x)] === undefined);
+  voz.pos = vacia < 0 ? 0 : vacia;
   voz.msg = `Columna ${voz.m.num}.`;
   conservarVoz = true; render(); pintarVoz();
 }
@@ -581,6 +613,7 @@ function despacharVoz(r) {
     seccion:       () => { const i = CS.indexOf(voz.c); location.hash = '#/cargo/' + CS[(i + r.delta + CS.length) % CS.length]; },
     seccion_abrir: () => abrirSeccionElectoral(r.cargo),
     ir:            () => { const i = indice(r.x); if (i >= 0) irA(i); pintarVoz(); },
+    votantes:      () => { irA(filasDe(voz.c).length); proponer(r.valor); },
     valor:         () => proponer(r.valor),
     otro:          () => { const i = indice(r.x); if (i >= 0) { irA(i); proponer(r.valor); } else pintarVoz(); },
   };
@@ -658,8 +691,11 @@ export function pintarVoz() {
 
   const fl    = filasDe(voz.c);
   if (!fl.length) return;
-  const [et, x] = fl[voz.pos];
-  const actual  = S.votos[key_of(voz.c, voz.m.num, x)];
+  const esHab   = voz.pos === fl.length;
+  const [et, x] = esHab ? ['Votantes por mesa (electores hábiles)', null] : fl[voz.pos];
+  const actual  = esHab
+    ? (voz.m.hab > 0 ? voz.m.hab : undefined)
+    : S.votos[key_of(voz.c, voz.m.num, x)];
   const todasLasMesas = mesasTrabajo(voz.c);
   const indiceGlobal  = todasLasMesas.findIndex(m => m.num === voz.m.num);
 
@@ -682,8 +718,10 @@ export function pintarVoz() {
 
   // Foco y auto-scroll en el input de la fila activa
   const ci  = mesasVisibles(voz.c).findIndex(m => m.num === voz.m.num);
-  const inp = app()?.querySelector(`input[data-c="${ci}"][data-r="${voz.pos}"]`);
-  if (inp) {
+  const inp = esHab
+    ? app()?.querySelector(`input[data-c="${ci}"][data-hab="1"]`)
+    : app()?.querySelector(`input[data-c="${ci}"][data-r="${voz.pos}"]`);
+  if (inp && !inp.disabled) {
     if (document.activeElement !== inp) inp.focus({ preventScroll: true });
     if (inp !== ultimaCeldaCentrada) {
       ultimaCeldaCentrada = inp;

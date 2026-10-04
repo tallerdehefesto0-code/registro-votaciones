@@ -23,15 +23,16 @@
 //     - mesasVisibles(c)         → mesas de la página actual
 //     - paginaPorCargo           → objeto mutable de páginas
 //     - getApp()                 → referencia al elemento #app
-//     - agregarCodigoMesa(c, codigo, aviso) → añade una columna
+//     - agregarCodigoMesa(c, codigo, aviso) → navega a una mesa del catálogo
 //     - actualizarTabla(c, diferido)        → refresca celdas sin re-render
 
 import { CARGOS, OTROS, key, claveOrg, mesasDe, orgsDe, datosMesa,
-         resumenCargo, pct, avisoMesa, maxCelda, cargosDeMesa }  from './calc.js';
+         resumenCargo, pct, maxCelda, errorHab,
+         mesaCerradaEnAlgunCargo }                                from './calc.js';
 import { st, save, registrarEvento }                            from './state.js';
 import { contextoDe, territorioActivo, navegacionCompleta,
          pasoNavegacion, etiquetaPaso, frasePaso,
-         opcionesNavegacion, geosDelAmbito }                    from './navegacion.js';
+         opcionesNavegacion }                                    from './navegacion.js';
 import { h, btn }                                               from './ui-helpers.js';
 import { mkPanelExp, mkBotonExp, FORMATOS }                     from './ui-tablero.js';
 
@@ -52,7 +53,6 @@ export const setSel           = v => { sel = v; };
 
 let vista      = localStorage.getItem('vista') || (matchMedia('(max-width:700px)').matches ? 'mesa' : 'completa');
 let reabriendo = null;
-let mesaPendiente = null;
 
 // Referencia al elemento #app (necesaria para querySelector en pintarVoz de app.js)
 const appEl = () => document.getElementById('app');
@@ -114,16 +114,28 @@ function filtrar(c, m, x, el) {
 }
 
 function guardarHab(c, m, el) {
-  const n     = parseInt(el.value, 10);
-  const mayor = Math.max(0, ...cargosDeMesa(S, m).map(cg => datosMesa(S, cg, m).total));
+  const antes = m.hab || 0;
   const nota  = appEl()?.querySelector('[data-k="nota"]');
-  if (!(n >= 1) || n < mayor) {
-    if (nota) nota.textContent = `Mesa ${m.num}: los electores hábiles deben ser un entero mayor que 0 y no menor que ${mayor} (el mayor total ya registrado).`;
-    el.value = m.hab > 0 ? m.hab : '';
+  const restaurar = () => { el.value = antes > 0 ? String(antes) : ''; };
+  if (mesaCerradaEnAlgunCargo(S, m)) {
+    if (nota) nota.textContent = 'Mesa cerrada: reábrela para cambiar los electores hábiles';
+    restaurar();
+    return;
+  }
+  const n = el.value.trim() === '' ? NaN : Number(el.value);
+  const error = errorHab(S, m, n);
+  if (error) {
+    if (nota) nota.textContent = `Mesa ${m.num}: ${error}`;
+    restaurar();
+    return;
+  }
+  if (n === antes) {
+    if (nota) nota.textContent = '';
     return;
   }
   if (nota) nota.textContent = '';
   m.hab = n;
+  registrarEvento(c, m.num, `Electores hábiles: ${antes} → ${n}`);
   save();
   actualizarTabla(c, true, null);
 }
@@ -150,8 +162,10 @@ function sincronizarCeldaVoz(c, m, fila, el, ctx) {
 function mover(e) {
   if (!['Tab', 'Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
   const arriba = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey);
-  const lista  = [...appEl().querySelectorAll('td input:not(:disabled)')]
-    .sort((a, b) => a.dataset.c - b.dataset.c || a.dataset.r - b.dataset.r);
+  const fila = el => el.dataset.hab === '1' ? Number.MAX_SAFE_INTEGER : Number(el.dataset.r);
+  const lista  = [...(appEl()?.querySelectorAll('td input:not(:disabled)[data-c]') || [])]
+    .sort((a, b) => Number(a.dataset.c) - Number(b.dataset.c) ||
+      fila(a) - fila(b));
   const sig = lista[lista.indexOf(e.target) + (arriba ? -1 : 1)];
   if (sig) { e.preventDefault(); sig.focus(); sig.select(); }
 }
@@ -247,6 +261,12 @@ function sincronizarValores(c) {
     const txt = v === undefined ? '' : String(v);
     if (el.value !== txt) el.value = txt;
   });
+  document.querySelectorAll('.tabla-votacion input[data-hab="1"][data-c]').forEach(el => {
+    const m = cols[Number(el.dataset.c)];
+    if (!m) return;
+    const txt = m.hab > 0 ? String(m.hab) : '';
+    if (el.value !== txt) el.value = txt;
+  });
 }
 
 export function actualizarTabla(c, diferido = false, ctx = null) {
@@ -254,7 +274,6 @@ export function actualizarTabla(c, diferido = false, ctx = null) {
 
   const territorio = territorioActivo(c);
   const ms = mesasVisibles(c);
-  const avs = [];
 
   const app = appEl();
   const set = (k, t) => { const e = app?.querySelector(`[data-k="${k}"]`); if (e) e.textContent = t; };
@@ -263,11 +282,6 @@ export function actualizarTabla(c, diferido = false, ctx = null) {
   ms.forEach(m => {
     const d     = datosMesa(S, c, m);
     const k     = m.num;
-    const aviso = avisoMesa(S, m);
-    if (aviso) avs.push(
-      `⚠ Mesa ${k}: el total por mesa no coincide entre cargos → ` +
-      aviso.map(([cg, t]) => `${CARGOS[cg]} ${num(t)}`).join(' · ')
-    );
     set('t|' + k,  num(d.total));
     set('om|' + k, d.omisos === null ? '—' : num(d.omisos));
     on('om|' + k, e => e.classList.toggle('mal', !d.cuadra));
@@ -281,9 +295,7 @@ export function actualizarTabla(c, diferido = false, ctx = null) {
       e.classList.toggle('sobra', m.hab > 0 && !d.cuadra);
     });
     on('bt|' + k, b => { if (d.estado !== 'Cerrada') b.disabled = !(d.completo && d.cuadra); });
-    set('av|' + k, aviso ? ' ⚠' : '');
   });
-  set('avtxt', avs.join('\n'));
 
   if (diferido || mesasDe(S, c, territorio).length > 200) agendarResumen(c);
   else actualizarResumen(c);
@@ -319,12 +331,12 @@ function comandosVoz() {
       li('«siguiente» / «anterior»', 'cambia de casilla (también «avanza» / «vuelve»)'),
       li('«borra»', 'vacía la casilla activa'),
       li('«blanco», «nulo», «observable»', 'va a esa fila; «blanco ocho» guarda 8'),
-      li('«nueva» y seis dígitos', 'agrega la columna de esa mesa'),
+      li('«nueva» + 6 dígitos', 'ir a la columna'),
+      li('«votantes 300»', 'guarda los electores hábiles de la mesa activa'),
       li('«siguiente columna» / «anterior columna»', 'cambia de mesa'),
       li('«siguiente cargo» / «anterior cargo»', 'cambia de cargo'),
       li('«abre distrito», «abre provincia», «abre consejero», «abre región»', 'abre ese cargo'),
       li('«cambiar»', 'cambia el territorio de trabajo'),
-      li('«organización cinco Apra»', 'agrega la organización N.º 5 llamada Apra'),
     ),
   );
 }
@@ -349,87 +361,74 @@ function formOrgRapida(c, ctx) {
   );
 }
 
-// ─── Agregar columna (mesa) ───────────────────────────────────────────────────
+// ─── Buscador de mesas del catálogo ────────────────────────────────────────────
 export function agregarCodigoMesa(c, texto, aviso, ctx) {
   const codigo = String(texto).trim();
-  if (!/^\d{6}$/.test(codigo)) {
-    if (aviso) aviso.textContent = 'El código debe tener seis dígitos.';
+  const informar = msg => {
+    if (aviso) aviso.textContent = msg;
+    const mensaje = appEl()?.querySelector('[data-k="mesa-msg"]');
+    if (mensaje && mensaje !== aviso) mensaje.textContent = msg;
+    if (ctx?.voz) ctx.voz.msg = msg;
     return false;
+  };
+  if (!/^\d{6}$/.test(codigo)) {
+    return informar('El código debe tener 6 dígitos.');
   }
   const territorio = territorioActivo(c);
-  let mesa = S.mesas.find(m => String(m.num) === codigo);
-  if (mesa && (!mesasDe(S, c, territorio).includes(mesa) || mesa.distrito !== contextoDe(c).distrito)) {
-    const msg = `Ese código no pertenece al distrito ${contextoDe(c).distrito}.`;
-    if (aviso) aviso.textContent = msg;
-    else if (ctx) ctx.voz.msg = msg;
-    return false;
-  }
-  if (!mesa) {
-    const geos = geosDelAmbito(c);
-    mesaPendiente = { cargo: c, codigo };
-    const msg = geos.length === 1
-      ? `El código ${codigo} no existe. Confírmalo para crearlo.`
-      : `Código ${codigo}: di el distrito al que pertenece.`;
-    if (ctx) ctx.voz.msg = msg;
-    if (aviso) aviso.textContent = msg;
-    ctx?.setConservarVoz(true);
-    ctx?.render();
-    return false;
-  }
+  const mesa = S.mesas.find(m => String(m.num) === codigo);
+  if (!mesa) return informar(`El código ${codigo} no existe en el catálogo`);
+  if (!mesasDe(S, c, territorio).includes(mesa) || mesa.distrito !== contextoDe(c).distrito)
+    return informar(`Ese código no pertenece al distrito ${contextoDe(c).distrito}.`);
+
+  const indice = mesasTrabajo(c).findIndex(m => String(m.num) === codigo);
+  if (indice < 0) return informar(`Ese código no pertenece al distrito ${contextoDe(c).distrito}.`);
+  paginaPorCargo[c] = Math.floor(indice / MAX_MESAS_BLOQUE);
+  const visibles = mesasVisibles(c);
+  sel = visibles.findIndex(m => String(m.num) === codigo);
+  if (sel < 0) return informar(`Ese código no pertenece al distrito ${contextoDe(c).distrito}.`);
+
   if (ctx?.voz.abierto && ctx.voz.c === c) {
-    ctx.voz.m   = mesa || S.mesas.find(m => String(m.num) === codigo);
-    ctx.voz.pos = Math.max(0, filasDe(c).findIndex(([, x]) => S.votos[key(c, codigo, x)] === undefined));
+    ctx.voz.m   = mesa;
+    const vacia = filasDe(c).findIndex(([, x]) => S.votos[key(c, codigo, x)] === undefined);
+    ctx.voz.pos = vacia < 0 ? 0 : vacia;
     ctx.voz.msg = `Columna ${codigo} lista.`;
     ctx.voz.esperandoCodigo  = false;
     ctx.voz.digitosCodigo    = '';
-    ctx.setConservarVoz(true);
   }
-  sel = mesasVisibles(c).findIndex(m => String(m.num) === codigo);
-  save(); ctx?.render();
+  if (aviso) aviso.textContent = '';
+  const mensaje = appEl()?.querySelector('[data-k="mesa-msg"]');
+  if (mensaje) mensaje.textContent = '';
+  ctx?.setConservarVoz(ctx.voz.abierto);
+  ctx?.render();
   return true;
 }
 
 function crearControlMesa(c, ctx) {
   const codigo = h('input', {
-    name: 'codigo', inputmode: 'numeric', pattern: '[0-9]{6}',
-    maxlength: 6, required: true, placeholder: '123456', 'aria-label': 'Código de mesa',
+    name: 'codigo', inputmode: 'numeric', pattern: '[0-9]{6}', maxlength: 6,
+    placeholder: '123456', 'aria-label': 'Código de mesa',
   });
-  const aviso = h('p', { class: 'mal' });
+  const aviso = h('p', { class: 'mal', 'data-k': 'mesa-msg' });
+  const dictarVotantes = () => {
+    if (!agregarCodigoMesa(c, codigo.value, aviso, ctx)) return;
+    const mesa = S.mesas.find(m => String(m.num) === String(codigo.value).trim());
+    if (!mesa) return;
+    ctx.voz.abierto = true;
+    ctx.voz.c = c;
+    ctx.voz.m = mesa;
+    ctx.voz.pos = filasDe(c).length;
+    ctx.voz.msg = '';
+    ctx.setConservarVoz(true);
+    ctx.render();
+    ctx.pintarVoz();
+  };
   return h('div', {},
-    h('form', { class: 'acciones',
+    h('form', { class: 'acciones buscador-mesas',
       onsubmit: e => { e.preventDefault(); agregarCodigoMesa(c, codigo.value, aviso, ctx); },
-    }, codigo, h('button', { type: 'submit' }, 'Agregar columna'), aviso),
+    }, codigo, h('button', { type: 'submit' }, 'Ir'),
+       h('button', { type: 'button', onclick: dictarVotantes }, 'Dictar votantes'), aviso),
     formOrgRapida(c, ctx),
   );
-}
-
-function selectorMesaPendiente(c, ctx) {
-  if (!mesaPendiente || mesaPendiente.cargo !== c) return null;
-  const geos = geosDelAmbito(c);
-  const texto = geos.length === 1
-    ? `El código ${mesaPendiente.codigo} no existe. ¿Crearlo?`
-    : `Código ${mesaPendiente.codigo}: indica su distrito.`;
-  return h('div', { class: 'acciones' },
-    h('span', { class: 'nota' }, texto),
-    ...geos.map(g => btn(geos.length === 1 ? `Crear en ${g.distrito}` : g.distrito,
-                         () => confirmarMesaPendiente(g, ctx))),
-    btn('Cancelar', () => {
-      mesaPendiente = null;
-      ctx?.setConservarVoz(true);
-      ctx?.render();
-    }),
-  );
-}
-
-function confirmarMesaPendiente(geo, ctx) {
-  if (!mesaPendiente) return;
-  const { codigo } = mesaPendiente;
-  S.mesas.push({ num: codigo, distrito: geo.distrito, local: `${geo.distrito} · ${codigo}`, hab: 0 });
-  paginaPorCargo[mesaPendiente.cargo] = Math.floor(mesasTrabajo(mesaPendiente.cargo).length / MAX_MESAS_BLOQUE);
-  mesaPendiente = null;
-  save();
-  // irAColumna lo llamará app.js tras este retorno (ya tiene ctx.voz)
-  ctx?.irAColumna?.(codigo);
 }
 
 // ─── Navegación geográfica visual ────────────────────────────────────────────
@@ -492,7 +491,6 @@ export function panelVoz(c, m, ctx) {
   if (estaCerrada(c, m))
     return h('div', {},
       h('p', { class: 'nota' }, 'Columna cerrada: reabre para dictar.'),
-      crearControlMesa(c, ctx),
     );
   if (!ctx.voz.abierto || ctx.voz.c !== c || ctx.voz.m?.num !== m.num) return null;
   return h('div', { class: 'card voz panel-voz' },
@@ -510,10 +508,8 @@ export function panelVoz(c, m, ctx) {
     ),
     h('div', { class: 'vobj',  'data-k': 'vobj' }),
     h('div', { class: 'nota',  'data-k': 'vayuda' }),
-    crearControlMesa(c, ctx),
     h('div', { class: 'nota voz-oido', 'data-k': 'voido' }),
     h('p',   { class: 'mal',   'data-k': 'vmsg' }),
-    selectorMesaPendiente(c, ctx),
     h('div', { class: 'barra' },
       btn('▲ Alto',     () => { ctx.irA(ctx.voz.pos - 1); ctx.pintarVoz(); }),
       btn('🗑 Olvida',  ctx.borrarCeldaVoz, { title: 'Vacía la celda actual' }),
@@ -529,7 +525,8 @@ export function panelVoz(c, m, ctx) {
           h('tr', {}, h('td', {}, '«Avanza columna» · «Vuelve columna»'), h('td', {}, 'Cambiar de columna')),
           h('tr', {}, h('td', {}, '«Cambiar»'),                     h('td', {}, 'Volver al selector de ámbito')),
           h('tr', {}, h('td', {}, '«Siguiente cargo» · «Anterior cargo»'), h('td', {}, 'Navegar entre secciones')),
-          h('tr', {}, h('td', {}, '«Nueva» + seis dígitos'),         h('td', {}, 'Crear o enfocar columna')),
+          h('tr', {}, h('td', {}, '«nueva» + 6 dígitos'),            h('td', {}, 'Ir a la columna')),
+          h('tr', {}, h('td', {}, '«votantes 300»'),                 h('td', {}, 'Guardar 300 electores hábiles')),
           h('tr', {}, h('td', {}, 'Una cantidad'),                   h('td', {}, 'Guardar y avanzar')),
         ),
       ),
@@ -545,12 +542,10 @@ export function panelVozTerritorioSinMesas(c, ctx) {
       btn('✕ Cerrar', () => { ctx.pararVoz(); ctx.render(); }),
     ),
     h('p', { class: 'nota' },
-      `Ámbito ${territorioActivo(c)} · sin mesas asignadas. Di «Nueva» y seis dígitos para añadir una mesa distrital, o impórtala en «Datos».`),
+      `Ámbito ${territorioActivo(c)} · sin mesas en el catálogo. Cárgalas desde «Datos» para comenzar el registro.`),
     h('p',   { class: 'nota',     'data-k': 'vayuda' }),
     h('div', { class: 'nota voz-oido', 'data-k': 'voido' }),
     h('p',   { class: 'mal',      'data-k': 'vmsg' }),
-    selectorMesaPendiente(c, ctx),
-    crearControlMesa(c, ctx),
   );
 }
 
@@ -624,20 +619,20 @@ export function tabla(c, ctx, descargar) {
       { disabled: pagina >= totalPaginas - 1, 'aria-label': 'Bloque siguiente' }),
   );
 
+  const buscador = crearControlMesa(c, ctx);
   const panel = ms.length ? panelVoz(c, ms[sel], ctx) : panelVozTerritorioSinMesas(c, ctx);
   const reg   = S.log.filter(e => e.cargo === c).slice(-5).reverse();
   const pe    = mkPanelExp(descargar, 'Exportar tabla · ' + CARGOS[c],
     FORMATOS('tabla').map(([t, id]) => [t, id, () => ({ cargo: c, territorio })]));
 
   return h('section', { class: 'vista-cargo' },
-    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, panel, comandosVoz(),
+    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, buscador, panel, comandosVoz(),
     h('div', { class: 'scroll tabla-scroll' },
       h('table', { class: 'tabla-votacion' },
         h('thead', {}, h('tr', {},
           h('th', {}),
           ...cols.map(m => h('th', {},
             String(m.num),
-            h('span', { 'data-k': 'av|' + m.num, class: 'mal' }),
             h('div', { class: 'sub' }, m.local),
           )),
           completa && h('th', {}, 'Total'),
@@ -648,12 +643,16 @@ export function tabla(c, ctx, descargar) {
           ...filas.map(fila),
           calc('Total por mesa',  't'),
           calc('Omisos (no votaron)', 'om'),
-          h('tr', { class: 'calc' },
+          h('tr', { class: 'calc', 'data-f': filas.length },
             h('th', {}, 'Votantes por mesa (electores hábiles)'),
-            ...cols.map(m => h('td', {}, h('input', {
+            ...cols.map((m, ci) => h('td', {}, h('input', {
               type: 'number', min: '1', inputmode: 'numeric', autocomplete: 'off',
               'aria-label': `Electores hábiles de la mesa ${m.num}`,
+              'data-hab': '1', 'data-c': ci,
               value: m.hab > 0 ? m.hab : '',
+              disabled: mesaCerradaEnAlgunCargo(S, m),
+              onkeydown: mover,
+              onfocus: e => sincronizarCeldaVoz(c, m, filas.length, e.target, ctx),
               onchange: e => guardarHab(c, m, e.target),
             }))),
             completa && h('td', { 'data-k': 'hab|T' }),
@@ -681,7 +680,6 @@ export function tabla(c, ctx, descargar) {
       )
     ),
     h('p', { class: 'mal', 'data-k': 'nota' }),
-    h('pre', { class: 'msg', 'data-k': 'avtxt' }),
     h('p', {}, mkBotonExp('Exportar tabla', pe)),
     pe,
     panelReabrir(c, ctx),
