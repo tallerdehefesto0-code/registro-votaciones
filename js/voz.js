@@ -32,6 +32,7 @@ const COMANDOS = {
   borrar: ['quita', 'olvida', 'borra', 'borrar'],
 };
 const NUEVA_ALIASES = ['nueva', 'nueve', 'mueva', 'prueba', 'cueva', 'lleva'];
+const ORG_ALIASES = ['organizacion', 'organizaciones'];
 const SECCIONES = {
   distrito: ['abre distrito'],
   provincia: ['abre provincia'],
@@ -262,6 +263,12 @@ export function interpretar(texto) {
   }
 
   if (cmd(t0, NUEVA_ALIASES)) {
+    const iOrg = cmd(t0, NUEVA_ALIASES) ? 1 : 0;
+    if (parecido(tk[iOrg], ORG_ALIASES)) {
+      const n = numero(tk.slice(iOrg + 1));
+      return n !== null ? { tipo: 'org_nueva', n } : { tipo: 'nada' };
+    }
+
     const cod = codigoSeis(tk.slice(1));
     if (cod !== null) return { tipo: 'ir_col', cod };
     return { tipo: 'nueva', digitos: digitosDeTokens(tk.slice(1)) ?? '' };

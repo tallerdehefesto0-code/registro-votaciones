@@ -64,15 +64,6 @@ export const filasDe = c => [
   ...Object.entries(OTROS).map(([x, t]) => [t, x, false]),
 ];
 
-// Asegura que el cargo tenga al menos una organización plantilla
-export function asegurarPlantillaBase(c, territorio) {
-  if (orgsDe(S, c, territorio).length) return;
-  S.orgs[c].push(...['A', 'B', 'C'].map((letra, i) => ({
-    n: i + 1, nombre: `Candidato ${letra}`, cand: '', territorio,
-  })));
-  save();
-}
-
 // ─── Paginación de mesas ──────────────────────────────────────────────────────
 export const mesasTrabajo = c => {
   const distrito = contextoDe(c)?.distrito;
@@ -298,6 +289,37 @@ export function actualizarTabla(c, diferido = false, ctx = null) {
   else actualizarResumen(c);
 }
 
+// ─── Agregar organización (fila) ──────────────────────────────────────────────
+export function agregarOrganizacion(c, texto, nombre, aviso, ctx) {
+  const n          = parseInt(texto, 10);
+  const territorio = territorioActivo(c);
+  const dec = t => { if (aviso) aviso.textContent = t; else if (ctx) ctx.voz.msg = t; return false; };
+  if (!Number.isInteger(n) || n < 1 || n > 60) return dec('El número de orden debe ser un entero mayor que 0.');
+  if (!territorio)                   return dec('Primero elige el territorio de trabajo.');
+  if (S.orgs[c].some(o => o.n === n && o.territorio === territorio))
+    return dec(`El número ${n} ya existe en ${territorio}.`);
+  if (mesasDe(S, c, territorio).some(m => estaCerrada(c, m)))
+    return dec('Hay mesas cerradas en este cargo: reábrelas antes de agregar una organización.');
+  S.orgs[c].push({ n, nombre: String(nombre || '').trim() || 'Organización ' + n, cand: '', territorio });
+  S.orgs[c].sort((a, b) => (a.territorio || '').localeCompare(b.territorio || '') || a.n - b.n);
+  save();
+  if (ctx?.voz) ctx.voz.msg = `Organización ${n} agregada.`;
+  ctx?.setConservarVoz?.(true);
+  ctx?.render();
+  return true;
+}
+
+function formOrgRapida(c, ctx) {
+  const n   = h('input', { type: 'number', min: '1', inputmode: 'numeric', placeholder: 'N.º', 'aria-label': 'Número de la organización en la cédula' });
+  const nom = h('input', { placeholder: 'Nombre (opcional)', 'aria-label': 'Nombre de la organización' });
+  const msg = h('span', { class: 'mal' });
+  return h('details', {},
+    h('summary', {}, 'Agregar organización a esta tabla'),
+    h('div', { class: 'acciones' }, n, nom,
+      btn('Agregar', () => agregarOrganizacion(c, n.value, nom.value, msg, ctx)), msg),
+  );
+}
+
 // ─── Agregar columna (mesa) ───────────────────────────────────────────────────
 export function agregarCodigoMesa(c, texto, aviso, ctx) {
   const codigo = String(texto).trim();
@@ -505,7 +527,6 @@ export function tabla(c, ctx, descargar) {
   if (!navegacionCompleta(c)) return vistaSeleccionTerritorios(c, ctx);
 
   const territorio = territorioActivo(c);
-  asegurarPlantillaBase(c, territorio);
 
   const ms     = mesasVisibles(c);
   const titulo = h('h2', {}, 'Tabla de votos · ' + CARGOS[c] + (territorio ? ' · ' + territorio : ''));
@@ -577,7 +598,7 @@ export function tabla(c, ctx, descargar) {
     FORMATOS('tabla').map(([t, id]) => [t, id, () => ({ cargo: c, territorio })]));
 
   return h('section', { class: 'vista-cargo' },
-    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, panel,
+    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, panel, formOrgRapida(c, ctx),
     h('div', { class: 'scroll tabla-scroll' },
       h('table', { class: 'tabla-votacion' },
         h('thead', {}, h('tr', {},

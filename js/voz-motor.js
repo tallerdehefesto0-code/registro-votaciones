@@ -23,8 +23,8 @@ import { navegacionCargo, contextoDe, navegacionCompleta,
 import { h }                                                       from './ui-helpers.js';
 import { filasDe, mesasTrabajo, mesasVisibles,
          paginaPorCargo, setSel, actualizarTabla,
-         agregarCodigoMesa, asegurarPlantillaBase,
-         MAX_MESAS_BLOQUE, getApp }                                from './ui-tabla.js';
+         agregarCodigoMesa, MAX_MESAS_BLOQUE, getApp, 
+         agregarOrganizacion }                                     from './ui-tabla.js';
 import { setFiltroBit }                                            from './ui-bitacora.js';
 
 // ─── Acceso al estado ─────────────────────────────────────────────────────────
@@ -410,7 +410,6 @@ function entrarPorCodigo(geo, codigo) {
   voz.esperandoCodigo = false; voz.digitosCodigo = '';
   n.region = geo.region; n.provincia = geo.provincia; n.distrito = geo.distrito;
   paginaPorCargo[c] = 0;
-  asegurarPlantillaBase(c, territorioActivo(c));
   let mesa = S.mesas.find(m => String(m.num) === codigo);
   if (!mesa) {
     mesa = { num: codigo, distrito: geo.distrito, local: `${geo.distrito} · ${codigo}`, hab: 0 };
@@ -489,7 +488,7 @@ function seleccionarTerritorio(c, nombre) {
   // Navegación completa: posicionar en la primera mesa no cerrada
   const territorio = (c === 'distrito' ? contextoDe(c).distrito
     : c === 'region' ? contextoDe(c).region : contextoDe(c).provincia);
-  asegurarPlantillaBase(c, territorio);
+  
   const ms              = mesasVisibles(c);
   const estaCerradaFn   = (cargo, m) => !!S.cerradas[cargo + '|' + m.num];
   const abierta         = ms.findIndex(m => !estaCerradaFn(c, m));
@@ -558,6 +557,7 @@ function despacharVoz(r) {
     'cmd:abajo':   () => { irA(voz.pos + 1); pintarVoz(); },
     'cmd:alto':    () => { irA(voz.pos - 1); pintarVoz(); },
     'cmd:cambiar': () => volverSeleccionTerritorio(voz.c),
+    org_nueva:     () => { agregarOrganizacion(voz.c, r.n, '', null, ctx); pintarVoz(); },
     col_adelante:  () => navegarColumna(1),
     col_vuelve:    () => navegarColumna(-1),
     seccion:       () => { const i = CS.indexOf(voz.c); location.hash = '#/cargo/' + CS[(i + r.delta + CS.length) % CS.length]; },
