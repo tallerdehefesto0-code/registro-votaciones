@@ -4,13 +4,17 @@
 // Usa los mismos lectores y validadores de csv.js que los botones de subir archivo
 // (leerMesas, leerOrgs), así que las reglas son las mismas.
 //
-// Solo escribe en el estado si TODO es válido: si algo falla, no se toca nada.
-// Nunca pisa datos existentes: si el dispositivo ya tiene mesas, organizaciones o votos, no hace nada.
+// • Solo escribe en el estado si TODO es válido: si algo falla, no se toca nada.
+// • Nunca pisa datos existentes (se vuelve a comprobar justo antes de escribir).
+// • Cada lectura tiene un límite de 8 segundos: sin internet o con red lenta no se queda esperando.
+// • No lanza errores: devuelve { cargado, msg }.
 //
 // Archivos esperados (relativos a la raíz de la app):
 //   datos/mesas-lambayeque.csv
 //   datos/organizaciones-lambayeque-ferrenafe.csv
 //   datos/organizaciones-chiclayo.csv
+//
+// IMPORTANTE: llamar SIN await en el arranque (ver app.js), para que la app abra primero.
 //
 // Dependencias: state.js, csv.js.
 
@@ -20,12 +24,22 @@ import { leerMesas, leerOrgs } from './csv.js';
 const ARCHIVO_MESAS = 'mesas-lambayeque.csv';
 const ARCHIVOS_ORGS = ['organizaciones-lambayeque-ferrenafe.csv', 'organizaciones-chiclayo.csv'];
 const CARGOS = ['distrito', 'provincia', 'region', 'consejero'];
+const LIMITE_MS = 8000;
 
 // La ruta se calcula respecto a este módulo (js/), así que sirve en GitHub Pages y en localhost.
 async function leerTexto(nombre) {
-  const res = await fetch(new URL(`../datos/${nombre}`, import.meta.url));
-  if (!res.ok) throw new Error(`No se pudo leer ${nombre} (código ${res.status})`);
-  return (await res.text()).replace(/^\uFEFF/, '');
+  const ctl = new AbortController();
+  const reloj = setTimeout(() => ctl.abort(), LIMITE_MS);
+  try {
+    const res = await fetch(new URL(`../datos/${nombre}`, import.meta.url), { signal: ctl.signal });
+    if (!res.ok) throw new Error(`No se pudo leer ${nombre} (código ${res.status})`);
+    return (await res.text()).replace(/^\uFEFF/, '');
+  } catch (err) {
+    if (err && err.name === 'AbortError') throw new Error(`${nombre}: tardó demasiado en responder`);
+    throw err;
+  } finally {
+    clearTimeout(reloj);
+  }
 }
 
 export function dispositivoVacio(S) {
@@ -34,10 +48,8 @@ export function dispositivoVacio(S) {
     && CARGOS.every(c => !((S.orgs || {})[c] || []).length);
 }
 
-// Devuelve { cargado: boolean, msg: string }. No lanza errores.
 export async function cargarOficialesSiVacio() {
-  const S = st.S;
-  if (!dispositivoVacio(S)) return { cargado: false, msg: 'El dispositivo ya tiene datos: no se cargó nada.' };
+  if (!dispositivoVacio(st.S)) return { cargado: false, msg: 'El dispositivo ya tiene datos: no se cargó nada.' };
 
   try {
     // 1. Leer y validar todo, sin tocar el estado
@@ -52,7 +64,11 @@ export async function cargarOficialesSiVacio() {
     }
     CARGOS.forEach(c => orgs[c].sort((a, b) => (a.territorio || '').localeCompare(b.territorio || '') || a.n - b.n));
 
-    // 2. Comprobar que mesas y organizaciones apunten a lugares que existen en la geografía
+    // 2. El estado pudo cambiar mientras se leía (por ejemplo, el usuario cargó algo a mano): volver a mirar
+    const S = st.S;
+    if (!dispositivoVacio(S)) return { cargado: false, msg: 'Mientras se leían los datos oficiales el dispositivo recibió datos: no se cargó nada.' };
+
+    // 3. Comprobar que mesas y organizaciones apunten a lugares que existen en la geografía
     const geo = S.geografia || [];
     const distritos = new Set(geo.map(g => g.distrito));
     const provincias = new Set(geo.map(g => g.provincia));
@@ -67,7 +83,7 @@ export async function cargarOficialesSiVacio() {
       throw new Error('Lugares que no existen en la geografía de la app: ' + [...faltan].slice(0, 5).join(', ') + (faltan.size > 5 ? '…' : ''));
     }
 
-    // 3. Todo válido: recién ahora se escribe
+    // 4. Todo válido: recién ahora se escribe
     S.mesas = rm.mesas;
     S.orgs = orgs;
     await save();

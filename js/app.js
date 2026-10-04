@@ -68,12 +68,11 @@ enlazarRender(render);
 (async () => {
   setEstado((await cargar()) || vacio());
   asegurarGeografia();
-  const ofi = await cargarOficialesSiVacio();
-  console.info(ofi.msg);
   iniciarAuth();
   montarSesion(document.getElementById('sesion'));
   await save();
   window.addEventListener('hashchange', render);
   render();
+  cargarOficialesSiVacio().then(ofi => { console.info(ofi.msg); if (ofi.cargado) render(); });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 })();
