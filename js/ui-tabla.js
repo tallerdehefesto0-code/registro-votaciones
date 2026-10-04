@@ -289,24 +289,44 @@ export function actualizarTabla(c, diferido = false, ctx = null) {
   else actualizarResumen(c);
 }
 
-// ─── Agregar organización (fila) ──────────────────────────────────────────────
 export function agregarOrganizacion(c, texto, nombre, aviso, ctx) {
-  const n          = parseInt(texto, 10);
   const territorio = territorioActivo(c);
   const dec = t => { if (aviso) aviso.textContent = t; else if (ctx) ctx.voz.msg = t; return false; };
-  if (!Number.isInteger(n) || n < 1 || n > 60) return dec('El número de orden debe ser un entero mayor que 0.');
-  if (!territorio)                   return dec('Primero elige el territorio de trabajo.');
-  if (S.orgs[c].some(o => o.n === n && o.territorio === territorio))
-    return dec(`El número ${n} ya existe en ${territorio}.`);
+  if (!territorio) return dec('Primero elige el territorio de trabajo.');
+  const nom = String(nombre || '').trim();
+  const propias = S.orgs[c].filter(o => o.territorio === territorio);
+  const n = (texto === '' || texto == null) ? Math.max(0, ...propias.map(o => o.n)) + 1 : parseInt(texto, 10);
+  if (!Number.isInteger(n) || n < 1 || n > 60) return dec('El número de orden debe estar entre 1 y 60.');
+  if (propias.some(o => o.n === n)) return dec(`El número ${n} ya existe en ${territorio}.`);
+  if (nom && propias.some(o => o.nombre.toLowerCase() === nom.toLowerCase())) return dec(`«${nom}» ya existe en ${territorio}.`);
   if (mesasDe(S, c, territorio).some(m => estaCerrada(c, m)))
     return dec('Hay mesas cerradas en este cargo: reábrelas antes de agregar una organización.');
-  S.orgs[c].push({ n, nombre: String(nombre || '').trim() || 'Organización ' + n, cand: '', territorio });
+  S.orgs[c].push({ n, nombre: nom || 'Organización ' + n, cand: '', territorio });
   S.orgs[c].sort((a, b) => (a.territorio || '').localeCompare(b.territorio || '') || a.n - b.n);
   save();
-  if (ctx?.voz) ctx.voz.msg = `Organización ${n} agregada.`;
+  if (ctx?.voz) ctx.voz.msg = `«${nom || 'Organización ' + n}» agregada como N.º ${n}.`;
   ctx?.setConservarVoz?.(true);
   ctx?.render();
   return true;
+}
+
+function comandosVoz() {
+  const li = (a, b) => h('li', {}, h('b', {}, a), ' — ', b);
+  return h('details', { class: 'nota', open: true },
+    h('summary', {}, 'Comandos de voz'),
+    h('ul', {},
+      li('«cuarenta y cinco» o «cuatro cinco»', 'guarda la cantidad en la casilla activa y baja a la siguiente'),
+      li('«siguiente» / «anterior»', 'cambia de casilla (también «avanza» / «vuelve»)'),
+      li('«borra»', 'vacía la casilla activa'),
+      li('«blanco», «nulo», «observable»', 'va a esa fila; «blanco ocho» guarda 8'),
+      li('«nueva» y seis dígitos', 'agrega la columna de esa mesa'),
+      li('«siguiente columna» / «anterior columna»', 'cambia de mesa'),
+      li('«siguiente cargo» / «anterior cargo»', 'cambia de cargo'),
+      li('«abre distrito», «abre provincia», «abre consejero», «abre región»', 'abre ese cargo'),
+      li('«cambiar»', 'cambia el territorio de trabajo'),
+      li('«organización cinco Apra»', 'agrega la organización N.º 5 llamada Apra'),
+    ),
+  );
 }
 
 function formOrgRapida(c, ctx) {
@@ -598,7 +618,7 @@ export function tabla(c, ctx, descargar) {
     FORMATOS('tabla').map(([t, id]) => [t, id, () => ({ cargo: c, territorio })]));
 
   return h('section', { class: 'vista-cargo' },
-    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, panel, formOrgRapida(c, ctx),
+    volver, titulo, rutaNavegacion(c, ctx), barra, navBloque, navMesa, panel, formOrgRapida(c, ctx), comandosVoz(),
     h('div', { class: 'scroll tabla-scroll' },
       h('table', { class: 'tabla-votacion' },
         h('thead', {}, h('tr', {},

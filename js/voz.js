@@ -265,9 +265,12 @@ export function interpretar(texto) {
   if (cmd(t0, NUEVA_ALIASES)) {
     const iOrg = cmd(t0, NUEVA_ALIASES) ? 1 : 0;
     if (parecido(tk[iOrg], ORG_ALIASES)) {
-      const n = numero(tk.slice(iOrg + 1));
-      return n !== null ? { tipo: 'org_nueva', n } : { tipo: 'nada' };
-    }
+      const palabras = String(texto).trim().split(/\s+/);
+      let n = null, k = Math.min(3, tk.length - iOrg - 1);
+      for (; k >= 1; k--) { n = numero(tk.slice(iOrg + 1, iOrg + 1 + k)); if (n !== null) break; }
+      const nombre = palabras.slice(iOrg + 1 + (n !== null ? k : 0)).join(' ').replace(/[.,;:!?]+$/, '');
+      return { tipo: 'org_nueva', n, nombre };
+    } 
 
     const cod = codigoSeis(tk.slice(1));
     if (cod !== null) return { tipo: 'ir_col', cod };

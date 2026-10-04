@@ -322,6 +322,17 @@ export function abrirVozSinTerritorio(c) {
   conservarVoz = true; render(); iniciarVoz();
 }
 
+function agregarOrgPorVoz(r) {
+  if (r.n === null || !r.nombre) {
+    voz.esperandoOrg = true;
+    voz.msg = 'Di el número de la cédula y el nombre, por ejemplo «cinco Apra» (o «cancelar»).';
+    return pintarVoz();
+  }
+  const nombre = r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1);
+  agregarOrganizacion(voz.c, r.n, nombre, null, ctx);
+  pintarVoz();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LÓGICA DE VOZ: guardar / borrar / navegar
 // ─────────────────────────────────────────────────────────────────────────────
@@ -557,7 +568,6 @@ function despacharVoz(r) {
     'cmd:abajo':   () => { irA(voz.pos + 1); pintarVoz(); },
     'cmd:alto':    () => { irA(voz.pos - 1); pintarVoz(); },
     'cmd:cambiar': () => volverSeleccionTerritorio(voz.c),
-    org_nueva:     () => { agregarOrganizacion(voz.c, r.n, '', null, ctx); pintarVoz(); },
     col_adelante:  () => navegarColumna(1),
     col_vuelve:    () => navegarColumna(-1),
     seccion:       () => { const i = CS.indexOf(voz.c); location.hash = '#/cargo/' + CS[(i + r.delta + CS.length) % CS.length]; },
@@ -575,6 +585,13 @@ function despacharVoz(r) {
 
 function procesarVoz(texto) {
   const r = interpretar(texto);
+  if (voz.esperandoOrg) {
+    voz.esperandoOrg = false;
+    if (/^\s*cancel/i.test(texto)) { voz.msg = 'Cancelado.'; return pintarVoz(); }
+    return agregarOrgPorVoz(interpretar('organización ' + texto));
+  }
+  if (r.tipo === 'org_nueva') return agregarOrgPorVoz(r);
+
   if (r.tipo === 'seccion_abrir') return despacharVoz(r);
 
   // Código de mesa pendiente de distrito: lo que se diga se interpreta como distrito.
