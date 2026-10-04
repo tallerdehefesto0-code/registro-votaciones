@@ -68,3 +68,15 @@ export function avisoMesa(s, mesa) {
 export const maxCelda = (s, cargo, mesa, x) => mesa.hab > 0
   ? mesa.hab - (datosMesa(s, cargo, mesa).total - (s.votos[key(cargo, mesa.num, x)] || 0))
   : Number.MAX_SAFE_INTEGER;
+
+  // Mayor total de votos ya registrado en la mesa entre sus cargos: es el piso de los electores hábiles
+export const mayorTotalMesa = (s, mesa) =>
+  Math.max(0, ...cargosDeMesa(s, mesa).map(c => datosMesa(s, c, mesa).total || 0));
+
+// Motivo de rechazo de un valor de electores hábiles, o null si es válido
+export function errorHab(s, mesa, v) {
+  if (!Number.isInteger(v) || v < 1) return 'Los electores hábiles deben ser un entero mayor que 0.';
+  const piso = mayorTotalMesa(s, mesa);
+  if (v < piso) return `No puede ser menor que los votos ya registrados en la mesa (${piso}).`;
+  return null;
+}

@@ -31,7 +31,7 @@ const COMANDOS = {
   cambiar: ['cambiar', 'cambia', 'seleccion'],
   borrar: ['quita', 'olvida', 'borra', 'borrar'],
 };
-const NUEVA_ALIASES = ['nueva', 'nueve', 'mueva', 'prueba', 'cueva', 'lleva'];
+const NUEVA_ALIASES = ['nueva', 'mueva', 'prueba', 'cueva', 'lleva'];
 const ORG_ALIASES = ['organizacion', 'organizaciones'];
 const SECCIONES = {
   distrito: ['abre distrito'],
@@ -262,7 +262,7 @@ export function interpretar(texto) {
     if (cmd(t0, COMANDOS.anterior)) return { tipo: 'col_vuelve' };
   }
 
-  if (cmd(t0, NUEVA_ALIASES)) {
+  if (normalizarFonetica(t0) !== normalizarFonetica('nueve') && cmd(t0, NUEVA_ALIASES)) {
     const iOrg = cmd(t0, NUEVA_ALIASES) ? 1 : 0;
     if (parecido(tk[iOrg], ORG_ALIASES)) {
       const palabras = String(texto).trim().split(/\s+/);
@@ -275,6 +275,11 @@ export function interpretar(texto) {
     const cod = codigoSeis(tk.slice(1));
     if (cod !== null) return { tipo: 'ir_col', cod };
     return { tipo: 'nueva', digitos: digitosDeTokens(tk.slice(1)) ?? '' };
+  }
+
+  if (tk.length > 1 && cmd(t0, ['votantes', 'electores'])) {
+    const valor = numero(tk.slice(1));
+    if (valor !== null) return { tipo: 'votantes', valor };
   }
 
   if (OT_NORMALIZADO[t0] && tk.length > 1) {

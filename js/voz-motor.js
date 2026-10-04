@@ -322,14 +322,10 @@ export function abrirVozSinTerritorio(c) {
   conservarVoz = true; render(); iniciarVoz();
 }
 
-function agregarOrgPorVoz(r) {
-  if (r.n === null || !r.nombre) {
-    voz.esperandoOrg = true;
-    voz.msg = 'Di el número de la cédula y el nombre, por ejemplo «cinco Apra» (o «cancelar»).';
-    return pintarVoz();
-  }
-  const nombre = r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1);
-  agregarOrganizacion(voz.c, r.n, nombre, null, ctx);
+// Las organizaciones ya no se agregan por voz: con el catálogo oficial cargado, un
+// número mal oído cruzaría votos sin aviso. Se usa el formulario de la tabla.
+function agregarOrgPorVoz() {
+  voz.msg = 'Las organizaciones no se agregan por voz. Usa el formulario de la tabla.';
   pintarVoz();
 }
 
@@ -392,8 +388,14 @@ function codigoSinTerritorio(codigo) {
   const candidatos = distritosPosibles(c);
   const mesa       = S.mesas.find(m => String(m.num) === codigo);
 
-  // La mesa ya existe con distrito: el distrito se deduce solo.
-  if (mesa?.distrito) {
+  // La voz no crea mesas: el código tiene que estar en el catálogo.
+  if (!mesa) {
+    voz.msg = `La mesa ${codigo} no existe en el catálogo. Revisa el código.`;
+    return pintarVoz();
+  }
+
+  // La mesa tiene distrito: se deduce solo.
+  if (mesa.distrito) {
     const geo = S.geografia.find(g => g.distrito === mesa.distrito);
     if (!geo || !candidatos.includes(geo)) {
       voz.msg = `La mesa ${codigo} pertenece a ${mesa.distrito}, que no corresponde a este cargo o ámbito.`;
@@ -407,25 +409,26 @@ function codigoSinTerritorio(codigo) {
   }
   if (candidatos.length === 1) return entrarPorCodigo(candidatos[0], codigo);
 
-  // Mesa nueva y varios distritos posibles: se pregunta el distrito por voz.
+  // Mesa del catálogo sin distrito y varios distritos posibles: se pregunta por voz.
   codigoPendiente = { cargo: c, codigo, opciones: candidatos };
   voz.msg = `Código ${codigo}: di el distrito al que pertenece (${candidatos.map(g => g.distrito).join(', ')}).`;
   pintarVoz();
 }
 
-// Fija región/provincia/distrito del cargo según el distrito de la mesa, crea la
-// mesa si no existía y salta a su columna.
+// Fija región/provincia/distrito del cargo según el distrito de la mesa y salta a su
+// columna. La voz NUNCA crea mesas: solo navega a las del catálogo.
 function entrarPorCodigo(geo, codigo) {
   const c = voz.c, n = contextoDe(c);
   codigoPendiente = null;
   voz.esperandoCodigo = false; voz.digitosCodigo = '';
+  const mesa = S.mesas.find(m => String(m.num) === codigo);
+  if (!mesa) {
+    voz.msg = `La mesa ${codigo} no existe en el catálogo. Revisa el código.`;
+    return pintarVoz();
+  }
   n.region = geo.region; n.provincia = geo.provincia; n.distrito = geo.distrito;
   paginaPorCargo[c] = 0;
-  let mesa = S.mesas.find(m => String(m.num) === codigo);
-  if (!mesa) {
-    mesa = { num: codigo, distrito: geo.distrito, local: `${geo.distrito} · ${codigo}`, hab: 0 };
-    S.mesas.push(mesa);
-  } else if (!mesa.distrito) mesa.distrito = geo.distrito;
+  if (!mesa.distrito) mesa.distrito = geo.distrito;
   save();
   return irAColumna(codigo);
 }
@@ -443,11 +446,16 @@ function irAColumna(cod) {
       voz.msg = `El código debe tener 6 dígitos. Oí: ${cod}.`;
       return pintarVoz();
     }
-    if (!agregarCodigoMesa(voz.c, codStr, null, ctx)) return;
+    // La voz no crea mesas: si no está en el catálogo, se avisa y no se hace nada.
+    if (!S.mesas.some(m => String(m.num) === codStr)) {
+      voz.msg = `La mesa ${codStr} no existe en el catálogo. Revisa el código.`;
+      return pintarVoz();
+    }
+    if (!agregarCodigoMesa(voz.c, codStr, null, ctx)) return pintarVoz();
     idxTotal = mesasTrabajo(voz.c).findIndex(m => String(m.num) === codStr);
     paginaPorCargo[voz.c] = Math.floor(idxTotal / MAX_MESAS_BLOQUE);
     nuevoIdx = mesasVisibles(voz.c).findIndex(m => String(m.num) === codStr);
-    voz.msg  = `Columna ${codStr} creada.`;
+    voz.msg  = `Columna ${codStr}.`;
   } else {
     voz.msg = `Columna ${cod}.`;
   }
@@ -585,11 +593,6 @@ function despacharVoz(r) {
 
 function procesarVoz(texto) {
   const r = interpretar(texto);
-  if (voz.esperandoOrg) {
-    voz.esperandoOrg = false;
-    if (/^\s*cancel/i.test(texto)) { voz.msg = 'Cancelado.'; return pintarVoz(); }
-    return agregarOrgPorVoz(interpretar('organización ' + texto));
-  }
   if (r.tipo === 'org_nueva') return agregarOrgPorVoz(r);
 
   if (r.tipo === 'seccion_abrir') return despacharVoz(r);
