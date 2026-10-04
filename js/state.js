@@ -22,18 +22,23 @@ import { usuarioActual } from './auth.js';
 // ─── Catálogo geográfico base (editar aquí para añadir provincias/distritos) ─
 export const geoData = [
   {
-    region: 'Lambayeque',
+    region: 'LAMBAYEQUE',
     provincias: [
       {
-        nombre: 'Lambayeque',
+        nombre: 'LAMBAYEQUE',
         distritos: [
-          'Lambayeque', 'Chóchope', 'Íllimo', 'Jayanca', 'Mochumí',
-          'Mórrope', 'Motupe', 'Olmos', 'Pacora', 'Salas',
-          'San José', 'Túcume',
+          'LAMBAYEQUE', 'CHOCHOPE', 'ILLIMO', 'JAYANCA', 'MOCHUMI',
+          'MORROPE', 'MOTUPE', 'OLMOS', 'PACORA', 'SALAS',
+          'SAN JOSE', 'TUCUME',
         ],
       },
-      { nombre: 'Chiclayo',  distritos: ['Chiclayo']  },
-      { nombre: 'Ferreñafe', distritos: ['Ferreñafe'] },
+      {
+        nombre: 'FERREÑAFE',
+        distritos: [
+          'FERREÑAFE', 'CAÑARIS', 'INCAHUASI', 'MANUEL ANTONIO',
+          'PITIPO', 'PUEBLO NUEVO',
+        ],
+      },
     ],
   },
 ];

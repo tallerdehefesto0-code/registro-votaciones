@@ -65,9 +65,6 @@ async function abrir(crearVistas, { titulo, multiple = false }) {
 
 export async function elegirCarpeta() {
   const r = await abrir(g => [
-    // Mis carpetas
-    new g.DocsView(g.ViewId.FOLDERS).setSelectFolderEnabled(true).setIncludeFolders(true),
-    // Carpetas que otras personas compartieron conmigo
     new g.DocsView(g.ViewId.FOLDERS).setSelectFolderEnabled(true).setIncludeFolders(true).setOwnedByMe(false),
   ], { titulo: 'Elige la carpeta de la elección' });
   return r ? r[0] : null;

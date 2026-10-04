@@ -22,7 +22,6 @@
 import { st, setEstado, vacio, save, asegurarGeografia } from './state.js';
 import { CARGOS, hayVotos }                               from './calc.js';
 import { leerOrgs, leerMesas, plantilla }                  from './csv.js';
-import { datosPrueba }                                     from './seed.js';
 import { territoriosDeCargo }                              from './navegacion.js';
 import { h, btn }                                          from './ui-helpers.js';
 
@@ -461,10 +460,6 @@ export function datos(render) {
     pestañasDatos(render),
     h('p', { class: 'nota' }, `Mesas: ${S.mesas.length} · Organizaciones → ${cuenta}`),
     h('div', { class: 'acciones' },
-      btn('Cargar datos de prueba', () => {
-        if ((S.mesas.length || bloq) && !confirm('Esto reemplaza todos los datos actuales. ¿Continuar?')) return;
-        setEstado(datosPrueba()); asegurarGeografia(); save(); render();
-      }),
       btn('Borrar votos', () => {
         if (confirm('¿Borrar todos los votos y cierres?')) { S.votos = {}; S.cerradas = {}; save(); render(); }
       }),

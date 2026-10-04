@@ -136,7 +136,7 @@ export function leerRespaldo(texto) {
   else {
     const codigos = new Set();
     s.mesas.forEach(m => {
-      if (!(m && typeof m.num === 'string' && /^\d{6}$/.test(m.num) && Number.isInteger(m.hab) && m.hab > 0 && typeof m.distrito === 'string' && Array.isArray(s.geografia) && s.geografia.some(g => g.distrito === m.distrito)) || codigos.has(m && m.num)) err.push('Mesa no válida, repetida o sin distrito: ' + (m && m.num));
+      if (!(m && typeof m.num === 'string' && /^\d{6}$/.test(m.num) && Number.isInteger(m.hab) && m.hab >= 0 && typeof m.distrito === 'string' && Array.isArray(s.geografia) && s.geografia.some(g => g.distrito === m.distrito)) || codigos.has(m && m.num)) err.push('Mesa no válida, repetida o sin distrito: ' + (m && m.num));
       else codigos.add(m.num);
     });
   }
